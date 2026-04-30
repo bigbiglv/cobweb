@@ -6,3 +6,6 @@ build/
 target/
 node_modules/
 ui/dist/
+ui/tauri-updater.key
+ui/tauri-updater.key.pub
+ui/tauri-updater.key.password.txt
