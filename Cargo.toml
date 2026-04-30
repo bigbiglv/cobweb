@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = [
+    "service",
+    "transport",
+    "auth",
+    "control",
+    "scheduler",
+    "share",
+    "storage",
+    "discovery",
+    "common",
+    "ui/src-tauri",
+]
+
+[profile.dev]
+debug = 1

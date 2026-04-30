@@ -1,0 +1,25 @@
+# Cobweb PC Project Guidelines
+
+当前位于 `cobweb-pc` 目录，这里是 PC 控制系统的代码核心库，采用了**单后台服务 + Tauri独立终端模型**设计。
+
+## 架构组成
+- `service` / 其他核心模块目录: 多个纯由 Rust 构建的核心后端模块库，处理网络通信、系统状态控制的逻辑。
+- `ui`: 基于 Vue 3 + Vite + Tauri V2 的 PC 前端界面系统。
+
+## 前端技术规范 (ui)
+1. **统一技术栈**：严格采用 Vue 3 (Composition API) + `<script setup>` + TypeScript 构建，状态采用纯净响应式实现。
+2. **社区规范**：严格遵循前端优质实践，所有的模块必须剥离干净数据与视图边界，不滥用 ad-hoc 的全局状态。
+3. **视觉标准**：本界面是一个带有质感和**玻璃态（Glassmorphism）设计语言**的“PC 控制台页面”，禁止产生丑陋、无最简临时 UI。
+4. **与 Rust 通信**：仅通过 `@tauri-apps/api` 向后端发起请求调用。
+5. **极其重要的主题规范**：我们已经工程化了一套以 `#8248f1` 为主的双轨 SCSS/CSS变量主题机制。在编写任何 Vue UI 或样式时，**绝对禁止写死使用 HEX 或 RGB 常量代码**。所有的颜色、圆角和动效时长必须采用我们在 `[data-theme]` 中定义好的全局 CSS Variables（例如 `var(--color-primary)`, `var(--text-main)`, `var(--radius-lg)` 等），以支持无缝皮肤扩展！
+6. **核心底线原则：功能与 UI 严格解耦**：所有的核心业务逻辑和底层系统功能及持久化等操作务必交由于 Rust 实现。Vue 前端界面即是“展示层”，**仅负责界面渲染和通过 Tauri API 发送/监听指令流**。无论 UI 如何调整大改，底层的 Rust 代码都不应受到任何影响。
+
+## Rust 后端规范 (crates)
+1. **高性能与低损耗**：空闲 CPU 占用必须接近 0。常驻轻量后台。
+2. **不允许耦合**：各模块（transport, control, scheduler, ...）职责边界严格隔离。`transport` 不可以直接写业务规则，网络协议（Rest/WebSocket）不渗透到具体的 `control` 指令里。
+3. **约定库**：
+   - HTTP使用 `axum` / `tokio` (禁止使用 `actix-web`)
+   - 错误处理 `thiserror`, `anyhow`
+   - 日志 `tracing`
+   - 持久化依靠 `sqlx + SQLite`
+4. **不允许通过轮询达到调度目的**，必须采用事件驱动。

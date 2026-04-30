@@ -1,0 +1,9 @@
+[package]
+name = "cobweb-scheduler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+cobweb-service = { path = "../service" }
