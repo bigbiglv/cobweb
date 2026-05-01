@@ -22,8 +22,9 @@ pub struct BatteryInfo {
 }
 
 pub fn attach_battery_info(devices: &mut [PeripheralDevice]) {
-    attach_standard_windows_batteries(devices);
     attach_logitech_hidpp_batteries(devices);
+    attach_flydigi_batteries(devices);
+    attach_royal_kludge_batteries(devices);
 }
 
 fn attach_battery(device: &mut PeripheralDevice, battery: &BatteryInfo) {
@@ -210,6 +211,22 @@ fn attach_logitech_hidpp_batteries(devices: &mut [PeripheralDevice]) {
 
 #[cfg(not(target_os = "windows"))]
 fn attach_logitech_hidpp_batteries(_devices: &mut [PeripheralDevice]) {}
+
+#[cfg(target_os = "windows")]
+fn attach_flydigi_batteries(devices: &mut [PeripheralDevice]) {
+    crate::flydigi_battery::attach_battery_info(devices);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn attach_flydigi_batteries(_devices: &mut [PeripheralDevice]) {}
+
+#[cfg(target_os = "windows")]
+fn attach_royal_kludge_batteries(devices: &mut [PeripheralDevice]) {
+    crate::royal_kludge_battery::attach_battery_info(devices);
+}
+
+#[cfg(not(target_os = "windows"))]
+fn attach_royal_kludge_batteries(_devices: &mut [PeripheralDevice]) {}
 
 #[cfg(target_os = "windows")]
 fn product_id_from_instance_id(instance_id: &str, vendor_id: u16) -> Option<u16> {

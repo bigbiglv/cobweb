@@ -34,9 +34,10 @@ const deviceError = ref<string | null>(null)
 let unlistenWebConsoleChanged: (() => void) | null = null
 
 const mockDevices: PeripheralDevice[] = [
-  { id: 'kb-01', classType: 'keyboard', name: 'MX Mechanical', status: 'ok', batteryPercentage: 68, batteryStatus: '使用中' },
-  { id: 'mouse-01', classType: 'mouse', name: 'MX Master 3S', status: 'ok', batteryPercentage: 86, batteryStatus: '使用中' },
+  { id: 'kb-01', classType: 'keyboard', name: 'RK98', status: 'ok' },
+  { id: 'mouse-01', classType: 'mouse', name: 'G502 X Wireless', status: 'ok', batteryPercentage: 86, batteryStatus: '使用中' },
   { id: 'mouse-02', classType: 'mouse', name: 'Anywhere Mouse', status: 'ok', batteryPercentage: 42, batteryStatus: '充电中' },
+  { id: 'pad-01', classType: 'XnaComposite', name: 'Flydigi Direwolf', status: 'ok' },
 ]
 
 type DeviceCategory = 'keyboard' | 'mouse' | 'controller' | 'usb' | 'other'
@@ -131,6 +132,8 @@ function getDeviceCategory(device: PeripheralDevice): DeviceCategory {
       return 'keyboard'
     case 'mouse':
       return 'mouse'
+    case 'xnacomposite':
+      return 'controller'
     case 'usb':
       return 'usb'
     default:
@@ -138,7 +141,7 @@ function getDeviceCategory(device: PeripheralDevice): DeviceCategory {
   }
 
   // HID 设备里控制器、键盘、鼠标都很常见，需要结合名称和实例 ID 再分类。
-  if (/(gamepad|controller|joystick|xbox|dualshock|dualsense|手柄|控制器)/i.test(fingerprint)) {
+  if (/(gamepad|controller|joystick|xinput|xbox|dualshock|dualsense|flydigi|飞智|手柄|控制器)/i.test(fingerprint)) {
     return 'controller'
   }
   if (/(keyboard|键盘)/i.test(fingerprint)) {
@@ -169,17 +172,16 @@ function hasBatteryInfo(device: PeripheralDevice) {
   return hasBatteryPercentage(device) || Boolean(device.batteryStatus)
 }
 
-function formatBatteryInfo(device: PeripheralDevice) {
-  const parts: string[] = []
-
-  if (hasBatteryPercentage(device)) {
-    parts.push(`电量 ${Math.round(device.batteryPercentage as number)}%`)
-  }
-  if (device.batteryStatus) {
-    parts.push(device.batteryStatus)
+function formatBatteryPercentageLabel(device: PeripheralDevice) {
+  if (!hasBatteryPercentage(device)) {
+    return '电量未知'
   }
 
-  return parts.join(' · ')
+  return `${Math.round(device.batteryPercentage as number)}%`
+}
+
+function formatBatteryStatusLabel(device: PeripheralDevice) {
+  return device.batteryStatus || (hasBatteryPercentage(device) ? '状态未知' : '未提供状态')
 }
 
 function getBatteryPercentage(device: PeripheralDevice) {
@@ -196,12 +198,12 @@ function isCharging(device: PeripheralDevice) {
 
 function getBatteryTone(device: PeripheralDevice) {
   if (isCharging(device)) {
-    return '74 222 128'
+    return '59 130 246'
   }
 
   const percentage = getBatteryPercentage(device)
   if (percentage === null) {
-    return '56 189 248'
+    return '100 116 139'
   }
   if (percentage <= 20) {
     return '248 113 113'
@@ -312,11 +314,16 @@ onUnmounted(async () => {
                   <component :is="getDeviceMeta(device).icon" class="size-9" />
                 </div>
                 <div
-                  v-if="hasBatteryInfo(device)"
-                  class="inline-flex max-w-36 items-center gap-1.5 rounded-full border border-border/70 bg-background/75 px-3 py-1 text-sm font-semibold text-foreground shadow-sm backdrop-blur"
+                  class="battery-chip grid min-w-28 gap-1 rounded-xl border border-border/70 bg-background/75 px-3 py-2 text-right shadow-sm backdrop-blur"
+                  :class="{ 'is-known': hasBatteryInfo(device), 'is-charging': isCharging(device) }"
                 >
-                  <component :is="getBatteryIcon(device)" class="size-4 shrink-0 text-primary" />
-                  <span class="truncate">{{ formatBatteryInfo(device) }}</span>
+                  <span class="inline-flex items-center justify-end gap-1.5 text-sm font-bold text-foreground">
+                    <component :is="getBatteryIcon(device)" class="size-4 shrink-0 text-primary" />
+                    {{ formatBatteryPercentageLabel(device) }}
+                  </span>
+                  <span class="text-xs font-medium text-muted-foreground">
+                    {{ formatBatteryStatusLabel(device) }}
+                  </span>
                 </div>
               </div>
 
@@ -371,6 +378,17 @@ onUnmounted(async () => {
 
 .peripheral-card.has-battery::before {
   opacity: 1;
+}
+
+.battery-chip.is-known {
+  border-color: rgb(var(--battery-rgb) / 0.35);
+  background:
+    linear-gradient(135deg, rgb(var(--battery-rgb) / 0.14), rgb(var(--battery-rgb) / 0.04)),
+    rgb(var(--background) / 0.72);
+}
+
+.battery-chip.is-charging {
+  color: rgb(37 99 235);
 }
 
 .peripheral-card.is-charging::after {

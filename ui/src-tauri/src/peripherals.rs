@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -49,7 +49,7 @@ fn fetch_devices() -> Result<Vec<PeripheralDevice>, String> {
     cmd.args(&[
         "-NoProfile",
         "-Command",
-        r#"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and $_.Status -eq 'OK' -and $_.Class -in @('Keyboard','Mouse') -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | ForEach-Object { $containerId = $null; try { $containerId = (Get-PnpDeviceProperty -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_ContainerId' -ErrorAction Stop).Data } catch {}; $containerText = if ($null -ne $containerId) { [string]$containerId } else { $null }; [pscustomobject]@{ InstanceId = $_.InstanceId; Class = $_.Class; FriendlyName = $_.FriendlyName; Status = $_.Status; ContainerId = $containerText } } | ConvertTo-Json -Compress"#
+        r#"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and $_.Status -eq 'OK' -and ( $_.Class -in @('Keyboard','Mouse','XnaComposite') -or ($_.Class -eq 'HIDClass' -and $_.FriendlyName -match '(?i)(game controller|gamepad|controller|joystick|手柄|控制器)') ) -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|Oray|VHF|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"#
     ]);
 
     #[cfg(target_os = "windows")]
@@ -71,6 +71,7 @@ fn fetch_devices() -> Result<Vec<PeripheralDevice>, String> {
         }
     };
 
+    normalize_device_labels(&mut devices);
     crate::peripheral_battery::attach_battery_info(&mut devices);
     devices = deduplicate_devices(devices);
     remove_auxiliary_hid_collections(&mut devices);
@@ -110,6 +111,12 @@ fn deduplicate_devices(devices: Vec<PeripheralDevice>) -> Vec<PeripheralDevice> 
 
 fn dedupe_key(device: &PeripheralDevice) -> String {
     let category = normalized_category(device);
+    if is_rk_device(device) {
+        return format!("{category}:rk:{}", product_key(device));
+    }
+    if is_flydigi_device(device) {
+        return format!("{category}:flydigi:{}", product_key(device));
+    }
     if let Some(container_id) = device
         .container_id
         .as_deref()
@@ -127,15 +134,41 @@ fn dedupe_key(device: &PeripheralDevice) -> String {
 }
 
 fn normalized_category(device: &PeripheralDevice) -> &'static str {
-    match device
+    let class_type = device
         .class_type
         .as_deref()
         .unwrap_or_default()
-        .to_ascii_lowercase()
-        .as_str()
-    {
+        .to_ascii_lowercase();
+    let fingerprint = format!(
+        "{} {}",
+        device.name.as_deref().unwrap_or_default(),
+        device.id.as_deref().unwrap_or_default()
+    )
+    .to_ascii_lowercase();
+
+    match class_type.as_str() {
         "keyboard" => "keyboard",
         "mouse" => "mouse",
+        "xnacomposite" => "controller",
+        "hidclass"
+            if contains_any(
+                &fingerprint,
+                &[
+                    "game controller",
+                    "gamepad",
+                    "controller",
+                    "joystick",
+                    "xinput",
+                    "xbox",
+                    "flydigi",
+                    "飞智",
+                    "手柄",
+                    "控制器",
+                ],
+            ) =>
+        {
+            "controller"
+        }
         _ => "other",
     }
 }
@@ -154,7 +187,8 @@ fn category_rank(device: &PeripheralDevice) -> u8 {
     match normalized_category(device) {
         "keyboard" => 0,
         "mouse" => 1,
-        _ => 2,
+        "controller" => 2,
+        _ => 3,
     }
 }
 
@@ -174,32 +208,42 @@ fn device_rank(device: &PeripheralDevice) -> u8 {
     if !is_generic_name(device.name.as_deref().unwrap_or_default()) {
         rank += 1;
     }
+    if device
+        .class_type
+        .as_deref()
+        .map(|class_type| class_type.eq_ignore_ascii_case("XnaComposite"))
+        .unwrap_or(false)
+    {
+        rank += 1;
+    }
     rank
 }
 
 fn is_generic_name(name: &str) -> bool {
     matches!(
         name.to_ascii_lowercase().as_str(),
-        "hid keyboard device" | "hid-compliant mouse" | "hid compliant mouse"
+        "hid keyboard device"
+            | "hid-compliant mouse"
+            | "hid compliant mouse"
+            | "hid-compliant game controller"
+            | "xbox 360 controller for windows"
     )
 }
 
 fn remove_auxiliary_hid_collections(devices: &mut Vec<PeripheralDevice>) {
-    promote_rk_keyboard_battery(devices);
-
-    let keyboard_containers = containers_for_category(devices, "keyboard");
+    let has_flydigi_xinput = devices.iter().any(|device| {
+        is_flydigi_device(device)
+            && device
+                .class_type
+                .as_deref()
+                .map(|class_type| class_type.eq_ignore_ascii_case("XnaComposite"))
+                .unwrap_or(false)
+    });
 
     devices.retain(|device| {
         let category = normalized_category(device);
-        let container_id = normalized_container_id(device);
 
-        if is_rk_device(device)
-            && category == "mouse"
-            && container_id
-                .as_deref()
-                .map(|id| keyboard_containers.contains(id))
-                .unwrap_or(false)
-        {
+        if is_rk_device(device) && category == "mouse" {
             return false;
         }
 
@@ -213,64 +257,24 @@ fn remove_auxiliary_hid_collections(devices: &mut Vec<PeripheralDevice>) {
         if is_logitech_device(device) && category == "keyboard" {
             return false;
         }
+        if has_flydigi_xinput && is_xbox_360_hid_game_controller(device) {
+            return false;
+        }
 
         true
     });
 }
 
-fn promote_rk_keyboard_battery(devices: &mut [PeripheralDevice]) {
-    let rk_mouse_batteries = devices
-        .iter()
-        .filter(|device| normalized_category(device) == "mouse" && is_rk_device(device))
-        .filter(|device| device.battery_percentage.is_some() || device.battery_status.is_some())
-        .filter_map(|device| {
-            normalized_container_id(device).map(|container_id| {
-                (
-                    container_id,
-                    (device.battery_percentage, device.battery_status.clone()),
-                )
-            })
-        })
-        .collect::<HashMap<_, _>>();
-
-    if rk_mouse_batteries.is_empty() {
-        return;
-    }
-
+fn normalize_device_labels(devices: &mut [PeripheralDevice]) {
     for device in devices.iter_mut() {
-        if normalized_category(device) != "keyboard" || !is_rk_device(device) {
-            continue;
+        if is_flydigi_device(device) && is_generic_name(device.name.as_deref().unwrap_or_default())
+        {
+            device.name = Some("Flydigi Direwolf".into());
         }
-        let Some(container_id) = normalized_container_id(device) else {
-            continue;
-        };
-        let Some((percentage, status)) = rk_mouse_batteries.get(&container_id) else {
-            continue;
-        };
-        if device.battery_percentage.is_none() {
-            device.battery_percentage = *percentage;
-        }
-        if device.battery_status.is_none() {
-            device.battery_status = status.clone();
+        if is_rk_device(device) && is_generic_name(device.name.as_deref().unwrap_or_default()) {
+            device.name = Some("RK98".into());
         }
     }
-}
-
-fn containers_for_category(devices: &[PeripheralDevice], category: &str) -> HashSet<String> {
-    devices
-        .iter()
-        .filter(|device| normalized_category(device) == category)
-        .filter_map(normalized_container_id)
-        .collect()
-}
-
-fn normalized_container_id(device: &PeripheralDevice) -> Option<String> {
-    device
-        .container_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| value.to_ascii_uppercase())
 }
 
 fn is_logitech_device(device: &PeripheralDevice) -> bool {
@@ -297,6 +301,51 @@ fn is_rk_device(device: &PeripheralDevice) -> bool {
         .unwrap_or(false);
 
     id_matches || name_matches
+}
+
+fn is_flydigi_device(device: &PeripheralDevice) -> bool {
+    let fingerprint = format!(
+        "{} {}",
+        device.name.as_deref().unwrap_or_default(),
+        device.id.as_deref().unwrap_or_default()
+    )
+    .to_ascii_lowercase();
+
+    fingerprint.contains("flydigi")
+        || fingerprint.contains("飞智")
+        || fingerprint.contains("direwolf")
+}
+
+fn is_xbox_360_hid_game_controller(device: &PeripheralDevice) -> bool {
+    device
+        .class_type
+        .as_deref()
+        .map(|class_type| class_type.eq_ignore_ascii_case("HIDClass"))
+        .unwrap_or(false)
+        && product_key(device) == "VID_045E&PID_028E"
+        && device
+            .name
+            .as_deref()
+            .map(|name| name.eq_ignore_ascii_case("HID-compliant game controller"))
+            .unwrap_or(false)
+}
+
+fn product_key(device: &PeripheralDevice) -> String {
+    let id = device.id.as_deref().unwrap_or_default().to_ascii_uppercase();
+    let vid = id
+        .find("VID_")
+        .and_then(|index| id.get(index..index + 8))
+        .unwrap_or("VID_0000");
+    let pid = id
+        .find("PID_")
+        .and_then(|index| id.get(index..index + 8))
+        .unwrap_or("PID_0000");
+
+    format!("{vid}&{pid}")
+}
+
+fn contains_any(value: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| value.contains(needle))
 }
 
 #[tauri::command]

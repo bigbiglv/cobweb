@@ -1,9 +1,13 @@
 mod features;
 #[cfg(target_os = "windows")]
+mod flydigi_battery;
+#[cfg(target_os = "windows")]
 mod logitech_hidpp;
 pub mod network;
 mod peripheral_battery;
 mod peripherals;
+#[cfg(target_os = "windows")]
+mod royal_kludge_battery;
 mod scheduler;
 pub mod store;
 mod web_console;
