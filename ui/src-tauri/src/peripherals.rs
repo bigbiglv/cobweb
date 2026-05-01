@@ -37,11 +37,12 @@ pub fn stop_watcher(state: &WatcherState) {
 fn fetch_devices() -> Result<Vec<PeripheralDevice>, String> {
     let mut cmd = Command::new("powershell");
 
-    // Pull common external-device classes, then let the UI normalize them into display buckets.
+    // Exclude broad classes like USB, HIDClass, Bluetooth which pull in system hubs/enumerators. 
+    // Filter specifically for Keyboard, Mouse, and keywords related to gamepads/controllers.
     cmd.args(&[
         "-NoProfile",
         "-Command",
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and ($_.Class -in @('Keyboard','Mouse','USB','HIDClass','Bluetooth','MEDIA','Image','Camera','SmartCardReader','WPD','Ports') -or $_.InstanceId -like 'USB\\*' -or $_.InstanceId -like 'HID\\*' -or $_.FriendlyName -match '(keyboard|mouse|gamepad|controller|joystick|usb|键盘|鼠标|手柄|控制器)') } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and ($_.Class -in @('Keyboard','Mouse') -or $_.FriendlyName -match '(?i)(keyboard|mouse|gamepad|controller|joystick|键盘|鼠标|手柄|控制器)') -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"
     ]);
 
     #[cfg(target_os = "windows")]
