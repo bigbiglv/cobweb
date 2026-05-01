@@ -1,5 +1,8 @@
 mod features;
+#[cfg(target_os = "windows")]
+mod logitech_hidpp;
 pub mod network;
+mod peripheral_battery;
 mod peripherals;
 mod scheduler;
 pub mod store;

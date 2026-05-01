@@ -3,4 +3,6 @@ export interface PeripheralDevice {
   classType: string;
   name: string;
   status: string;
+  batteryPercentage?: number | null;
+  batteryStatus?: string | null;
 }

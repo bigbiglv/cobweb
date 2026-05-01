@@ -18,6 +18,10 @@ pub struct PeripheralDevice {
     pub name: Option<String>,
     #[serde(alias = "Status")]
     pub status: Option<String>,
+    #[serde(alias = "BatteryPercentage")]
+    pub battery_percentage: Option<u8>,
+    #[serde(alias = "BatteryStatus")]
+    pub battery_status: Option<String>,
 }
 
 pub struct WatcherState {
@@ -37,12 +41,12 @@ pub fn stop_watcher(state: &WatcherState) {
 fn fetch_devices() -> Result<Vec<PeripheralDevice>, String> {
     let mut cmd = Command::new("powershell");
 
-    // Exclude broad classes like USB, HIDClass, Bluetooth which pull in system hubs/enumerators. 
+    // Exclude broad classes like USB, HIDClass, Bluetooth which pull in system hubs/enumerators.
     // Filter specifically for Keyboard, Mouse, and keywords related to gamepads/controllers.
     cmd.args(&[
         "-NoProfile",
         "-Command",
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and ($_.Class -in @('Keyboard','Mouse') -or $_.FriendlyName -match '(?i)(keyboard|mouse|gamepad|controller|joystick|键盘|鼠标|手柄|控制器)') -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"
+        r#"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and ($_.Class -in @('Keyboard','Mouse') -or $_.FriendlyName -match '(?i)(keyboard|mouse|gamepad|controller|joystick|rk98|rkgaming|royal kludge|royal|kludge|键盘|鼠标|手柄|控制器)') -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"#
     ]);
 
     #[cfg(target_os = "windows")]
@@ -55,15 +59,17 @@ fn fetch_devices() -> Result<Vec<PeripheralDevice>, String> {
         return Ok(Vec::new());
     }
 
-    // PowerShell ConvertTo-Json returns an object if only 1 item, or array if multiple.
-    if trimmed.starts_with('[') {
-        serde_json::from_str(trimmed).map_err(|e| e.to_string())
+    let mut devices = if trimmed.starts_with('[') {
+        serde_json::from_str(trimmed).map_err(|e| e.to_string())?
     } else {
         match serde_json::from_str::<PeripheralDevice>(trimmed) {
-            Ok(dev) => Ok(vec![dev]),
-            Err(_) => Ok(Vec::new()),
+            Ok(dev) => vec![dev],
+            Err(_) => Vec::new(),
         }
-    }
+    };
+
+    crate::peripheral_battery::attach_battery_info(&mut devices);
+    Ok(devices)
 }
 
 #[tauri::command]

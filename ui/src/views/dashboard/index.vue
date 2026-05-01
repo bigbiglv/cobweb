@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleHelp, Gamepad2, Globe2, Keyboard, Mouse, Usb } from 'lucide-vue-next'
+import { Battery, CircleHelp, Gamepad2, Globe2, Keyboard, Mouse, Usb } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -22,7 +22,7 @@ let unlistenWebConsoleChanged: (() => void) | null = null
 
 const mockDevices: PeripheralDevice[] = [
   { id: 'kb-01', classType: 'keyboard', name: 'MX Mechanical', status: 'ok' },
-  { id: 'mouse-01', classType: 'mouse', name: 'MX Master 3S', status: 'ok' },
+  { id: 'mouse-01', classType: 'mouse', name: 'MX Master 3S', status: 'ok', batteryPercentage: 86, batteryStatus: '使用中' },
   { id: 'gamepad-01', classType: 'hidclass', name: 'Xbox Wireless Controller', status: 'ok' },
   { id: 'usb-01', classType: 'usb', name: 'USB-C Dock', status: 'warning' },
   { id: 'audio-01', classType: 'media', name: 'Studio DAC', status: 'ok' },
@@ -105,6 +105,27 @@ function getDeviceCategory(device: PeripheralDevice): DeviceCategory {
 
 function getDeviceMeta(device: PeripheralDevice) {
   return categoryMeta[getDeviceCategory(device)]
+}
+
+function hasBatteryPercentage(device: PeripheralDevice) {
+  return typeof device.batteryPercentage === 'number' && Number.isFinite(device.batteryPercentage)
+}
+
+function hasBatteryInfo(device: PeripheralDevice) {
+  return hasBatteryPercentage(device) || Boolean(device.batteryStatus)
+}
+
+function formatBatteryInfo(device: PeripheralDevice) {
+  const parts: string[] = []
+
+  if (hasBatteryPercentage(device)) {
+    parts.push(`电量 ${Math.round(device.batteryPercentage as number)}%`)
+  }
+  if (device.batteryStatus) {
+    parts.push(device.batteryStatus)
+  }
+
+  return parts.join(' · ')
 }
 
 onMounted(async () => {
@@ -203,6 +224,13 @@ onUnmounted(async () => {
                 <p class="text-sm leading-6 text-muted-foreground">
                   设备 ID：{{ device.id.slice(0, 12) }}{{ device.id.length > 12 ? '…' : '' }}
                 </p>
+                <div
+                  v-if="hasBatteryInfo(device)"
+                  class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-accent/60 px-3 py-1 text-sm font-medium text-foreground"
+                >
+                  <Battery class="size-4 shrink-0 text-primary" />
+                  <span class="truncate">{{ formatBatteryInfo(device) }}</span>
+                </div>
               </div>
             </div>
           </article>
