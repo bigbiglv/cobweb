@@ -18,6 +18,7 @@ use std::os::windows::process::CommandExt;
 pub struct BatteryInfo {
     pub percentage: Option<u8>,
     pub status: Option<String>,
+    pub from_receiver: bool,
 }
 
 pub fn attach_battery_info(devices: &mut [PeripheralDevice]) {
@@ -62,14 +63,15 @@ fn attach_standard_windows_batteries(_devices: &mut [PeripheralDevice]) {}
 
 #[cfg(target_os = "windows")]
 fn is_standard_windows_battery_candidate(device: &PeripheralDevice) -> bool {
-    let id = device.id.as_deref().unwrap_or_default().to_ascii_uppercase();
-    let name = device.name.as_deref().unwrap_or_default().to_ascii_lowercase();
-
-    id.contains("BTH")
-        || id.contains("BLE")
-        || name.contains("rk")
-        || name.contains("royal")
-        || name.contains("kludge")
+    matches!(
+        device
+            .class_type
+            .as_deref()
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str(),
+        "keyboard" | "mouse"
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -159,6 +161,7 @@ fn query_standard_windows_batteries(ids: &[String]) -> HashMap<String, BatteryIn
                 BatteryInfo {
                     percentage: Some(row.battery_percentage),
                     status: None,
+                    from_receiver: false,
                 },
             )
         })
@@ -197,6 +200,9 @@ fn attach_logitech_hidpp_batteries(devices: &mut [PeripheralDevice]) {
         };
 
         if let Some(battery) = batteries.get(&product_id) {
+            if battery.from_receiver && !is_mouse_device(device) {
+                continue;
+            }
             attach_battery(device, battery);
         }
     }
@@ -216,4 +222,13 @@ fn product_id_from_instance_id(instance_id: &str, vendor_id: u16) -> Option<u16>
     let marker_index = normalized.find("PID_")?;
     let product_id = normalized.get(marker_index + 4..marker_index + 8)?;
     u16::from_str_radix(product_id, 16).ok()
+}
+
+#[cfg(target_os = "windows")]
+fn is_mouse_device(device: &PeripheralDevice) -> bool {
+    device
+        .class_type
+        .as_deref()
+        .map(|class_type| class_type.eq_ignore_ascii_case("mouse"))
+        .unwrap_or(false)
 }

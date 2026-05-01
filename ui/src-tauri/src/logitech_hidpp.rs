@@ -23,6 +23,7 @@ const RECEIVER_DEVICE_INDEXES: [u8; 6] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06];
 #[derive(Clone)]
 struct BatteryReading {
     product_id: u16,
+    from_receiver: bool,
     percentage: Option<u8>,
     status: Option<String>,
 }
@@ -41,6 +42,7 @@ pub fn battery_by_product_id() -> HashMap<u16, BatteryInfo> {
         batteries.entry(reading.product_id).or_insert(BatteryInfo {
             percentage: reading.percentage,
             status: reading.status,
+            from_receiver: reading.from_receiver,
         });
     }
 
@@ -79,6 +81,7 @@ fn query_batteries() -> Vec<BatteryReading> {
 
     for info in api.device_list().filter(is_logitech_hidpp_interface) {
         let product_id = info.product_id();
+        let from_receiver = is_receiver_interface(info);
         let Ok(device) = info.open_device(&api) else {
             continue;
         };
@@ -86,7 +89,9 @@ fn query_batteries() -> Vec<BatteryReading> {
         let _ = device.set_blocking_mode(false);
 
         for &device_index in candidate_device_indexes(info) {
-            if let Some(reading) = query_device_battery(&device, product_id, device_index) {
+            if let Some(reading) =
+                query_device_battery(&device, product_id, from_receiver, device_index)
+            {
                 readings.push(reading);
                 break;
             }
@@ -147,15 +152,17 @@ fn is_known_receiver_product_id(product_id: u16) -> bool {
 fn query_device_battery(
     device: &HidDevice,
     product_id: u16,
+    from_receiver: bool,
     device_index: u8,
 ) -> Option<BatteryReading> {
-    query_unified_battery(device, product_id, device_index)
-        .or_else(|| query_battery_level_status(device, product_id, device_index))
+    query_unified_battery(device, product_id, from_receiver, device_index)
+        .or_else(|| query_battery_level_status(device, product_id, from_receiver, device_index))
 }
 
 fn query_unified_battery(
     device: &HidDevice,
     product_id: u16,
+    from_receiver: bool,
     device_index: u8,
 ) -> Option<BatteryReading> {
     let feature_index = query_feature_index(device, device_index, FEATURE_UNIFIED_BATTERY)?;
@@ -179,12 +186,13 @@ fn query_unified_battery(
         level_status
     };
 
-    battery_reading(product_id, percentage, status)
+    battery_reading(product_id, from_receiver, percentage, status)
 }
 
 fn query_battery_level_status(
     device: &HidDevice,
     product_id: u16,
+    from_receiver: bool,
     device_index: u8,
 ) -> Option<BatteryReading> {
     let feature_index = query_feature_index(device, device_index, FEATURE_BATTERY_LEVEL_STATUS)?;
@@ -192,11 +200,12 @@ fn query_battery_level_status(
     let percentage = normalize_percentage(status[4]);
     let status = battery_level_charge_status(status[6]);
 
-    battery_reading(product_id, percentage, status)
+    battery_reading(product_id, from_receiver, percentage, status)
 }
 
 fn battery_reading(
     product_id: u16,
+    from_receiver: bool,
     percentage: Option<u8>,
     status: Option<String>,
 ) -> Option<BatteryReading> {
@@ -206,6 +215,7 @@ fn battery_reading(
 
     Some(BatteryReading {
         product_id,
+        from_receiver,
         percentage,
         status,
     })

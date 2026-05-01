@@ -1,8 +1,20 @@
 <script setup lang="ts">
-import { Battery, CircleHelp, Gamepad2, Globe2, Keyboard, Mouse, Usb } from 'lucide-vue-next'
+import {
+  Battery,
+  BatteryCharging,
+  CircleHelp,
+  Gamepad2,
+  Globe2,
+  Keyboard,
+  Mouse,
+  RefreshCw,
+  Usb,
+} from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import type { CSSProperties } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { Button } from '../../components/ui/button/index'
 import {
   Card,
   CardContent,
@@ -17,15 +29,14 @@ const webConsoleStatus = ref<WebConsoleStatus>({
   port: null,
   urls: [],
 })
-let unlistenDeviceChanged: (() => void) | null = null
+const refreshingDevices = ref(false)
+const deviceError = ref<string | null>(null)
 let unlistenWebConsoleChanged: (() => void) | null = null
 
 const mockDevices: PeripheralDevice[] = [
-  { id: 'kb-01', classType: 'keyboard', name: 'MX Mechanical', status: 'ok' },
+  { id: 'kb-01', classType: 'keyboard', name: 'MX Mechanical', status: 'ok', batteryPercentage: 68, batteryStatus: '使用中' },
   { id: 'mouse-01', classType: 'mouse', name: 'MX Master 3S', status: 'ok', batteryPercentage: 86, batteryStatus: '使用中' },
-  { id: 'gamepad-01', classType: 'hidclass', name: 'Xbox Wireless Controller', status: 'ok' },
-  { id: 'usb-01', classType: 'usb', name: 'USB-C Dock', status: 'warning' },
-  { id: 'audio-01', classType: 'media', name: 'Studio DAC', status: 'ok' },
+  { id: 'mouse-02', classType: 'mouse', name: 'Anywhere Mouse', status: 'ok', batteryPercentage: 42, batteryStatus: '充电中' },
 ]
 
 type DeviceCategory = 'keyboard' | 'mouse' | 'controller' | 'usb' | 'other'
@@ -65,6 +76,49 @@ const visibleDevices = computed(() =>
 )
 
 const primaryWebConsoleUrl = computed(() => webConsoleStatus.value.urls[0] || '等待服务启动')
+
+async function refreshDevices() {
+  if (!isTauri()) {
+    devices.value = mockDevices
+    return
+  }
+
+  refreshingDevices.value = true
+  deviceError.value = null
+
+  try {
+    const nextDevices = await invoke<PeripheralDevice[]>('get_peripheral_devices')
+    devices.value = mergeDeviceBatteryFallback(nextDevices, devices.value)
+  } catch (error) {
+    deviceError.value = '外设刷新失败'
+    console.error('Failed to load peripheral devices:', error)
+  } finally {
+    refreshingDevices.value = false
+  }
+}
+
+function mergeDeviceBatteryFallback(
+  nextDevices: PeripheralDevice[],
+  previousDevices: PeripheralDevice[],
+) {
+  const previousById = new Map(previousDevices.map((device) => [device.id, device]))
+
+  return nextDevices.map((device) => {
+    const previous = previousById.get(device.id)
+    if (!previous || hasBatteryInfo(device)) {
+      return device
+    }
+    if (!hasBatteryInfo(previous)) {
+      return device
+    }
+
+    return {
+      ...device,
+      batteryPercentage: previous.batteryPercentage,
+      batteryStatus: previous.batteryStatus,
+    }
+  })
+}
 
 function getDeviceCategory(device: PeripheralDevice): DeviceCategory {
   const classType = (device.classType || '').toLowerCase()
@@ -128,9 +182,53 @@ function formatBatteryInfo(device: PeripheralDevice) {
   return parts.join(' · ')
 }
 
+function getBatteryPercentage(device: PeripheralDevice) {
+  if (!hasBatteryPercentage(device)) {
+    return null
+  }
+
+  return Math.max(0, Math.min(100, Math.round(device.batteryPercentage as number)))
+}
+
+function isCharging(device: PeripheralDevice) {
+  return /充电|即将充满|已充满|慢速充电/i.test(device.batteryStatus || '')
+}
+
+function getBatteryTone(device: PeripheralDevice) {
+  if (isCharging(device)) {
+    return '74 222 128'
+  }
+
+  const percentage = getBatteryPercentage(device)
+  if (percentage === null) {
+    return '56 189 248'
+  }
+  if (percentage <= 20) {
+    return '248 113 113'
+  }
+  if (percentage <= 50) {
+    return '251 191 36'
+  }
+
+  return '52 211 153'
+}
+
+function getBatteryCardStyle(device: PeripheralDevice): CSSProperties {
+  const percentage = getBatteryPercentage(device)
+
+  return {
+    '--battery-level': `${percentage ?? 0}%`,
+    '--battery-rgb': getBatteryTone(device),
+  } as CSSProperties
+}
+
+function getBatteryIcon(device: PeripheralDevice) {
+  return isCharging(device) ? BatteryCharging : Battery
+}
+
 onMounted(async () => {
   if (!isTauri()) {
-    devices.value = mockDevices
+    await refreshDevices()
     return
   }
 
@@ -139,11 +237,7 @@ onMounted(async () => {
       webConsoleStatus.value = event.payload
     })
     webConsoleStatus.value = await invoke<WebConsoleStatus>('get_web_console_status')
-    devices.value = await invoke<PeripheralDevice[]>('get_peripheral_devices')
-    unlistenDeviceChanged = await listen<PeripheralDevice[]>('device-changed', (event) => {
-      devices.value = event.payload
-    })
-    await invoke('start_device_watch')
+    await refreshDevices()
   } catch (error) {
     console.error('Failed to load peripheral devices:', error)
   }
@@ -154,14 +248,7 @@ onUnmounted(async () => {
     return
   }
 
-  unlistenDeviceChanged?.()
   unlistenWebConsoleChanged?.()
-
-  try {
-    await invoke('stop_device_watch')
-  } catch (error) {
-    console.error('Failed to stop device watch:', error)
-  }
 })
 </script>
 
@@ -196,41 +283,53 @@ onUnmounted(async () => {
 
       <Card class="apple-section border-border/70 bg-card/95">
         <CardHeader class="gap-3">
-          <div class="space-y-2">
-            <CardTitle class="font-(--font-display) text-3xl tracking-[-0.03em]">
-              外设
-            </CardTitle>
-
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="space-y-1">
+              <CardTitle class="font-(--font-display) text-3xl tracking-[-0.03em]">
+                外设
+              </CardTitle>
+              <p v-if="deviceError" class="text-sm text-destructive">
+                {{ deviceError }}
+              </p>
+            </div>
+            <Button variant="outline" class="rounded-full" :disabled="refreshingDevices" @click="refreshDevices">
+              <RefreshCw class="size-4" :class="{ 'animate-spin': refreshingDevices }" />
+              <span>刷新</span>
+            </Button>
           </div>
         </CardHeader>
         <CardContent class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <article
             v-for="device in visibleDevices"
             :key="device.id"
-            class="rounded-[1.5rem] border border-border/70 bg-background/70 p-5 transition-transform duration-200 hover:-translate-y-0.5"
+            class="peripheral-card rounded-[1.25rem] border border-border/70 bg-background/80 p-5 transition-transform duration-200 hover:-translate-y-0.5"
+            :class="{ 'has-battery': hasBatteryInfo(device), 'is-charging': isCharging(device) }"
+            :style="getBatteryCardStyle(device)"
           >
-            <div class="flex flex-col gap-5">
-              <div class="flex size-16 items-center justify-center rounded-[1.25rem] border border-border/70 bg-accent/60 text-primary">
-                <component :is="getDeviceMeta(device).icon" class="size-9" />
-              </div>
-
-              <div class="space-y-2">
-                <p class="text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                  {{ getDeviceMeta(device).label }}
-                </p>
-                <h3 class="text-lg font-semibold tracking-[-0.02em] text-foreground">
-                  {{ device.name || '未命名设备' }}
-                </h3>
-                <p class="text-sm leading-6 text-muted-foreground">
-                  设备 ID：{{ device.id.slice(0, 12) }}{{ device.id.length > 12 ? '…' : '' }}
-                </p>
+            <div class="relative z-10 flex min-h-48 flex-col justify-between gap-5">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex size-[4.5rem] items-center justify-center rounded-[1.25rem] border border-border/70 bg-background/80 text-primary shadow-sm">
+                  <component :is="getDeviceMeta(device).icon" class="size-9" />
+                </div>
                 <div
                   v-if="hasBatteryInfo(device)"
-                  class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-accent/60 px-3 py-1 text-sm font-medium text-foreground"
+                  class="inline-flex max-w-36 items-center gap-1.5 rounded-full border border-border/70 bg-background/75 px-3 py-1 text-sm font-semibold text-foreground shadow-sm backdrop-blur"
                 >
-                  <Battery class="size-4 shrink-0 text-primary" />
+                  <component :is="getBatteryIcon(device)" class="size-4 shrink-0 text-primary" />
                   <span class="truncate">{{ formatBatteryInfo(device) }}</span>
                 </div>
+              </div>
+
+              <div class="min-w-0 space-y-2">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  {{ getDeviceMeta(device).label }}
+                </p>
+                <h3 class="text-xl font-semibold text-foreground">
+                  {{ device.name || '未命名设备' }}
+                </h3>
+                <p class="break-all text-sm leading-6 text-muted-foreground">
+                  设备 ID：{{ device.id.slice(0, 12) }}{{ device.id.length > 12 ? '…' : '' }}
+                </p>
               </div>
             </div>
           </article>
@@ -246,3 +345,51 @@ onUnmounted(async () => {
 
   </section>
 </template>
+
+<style scoped>
+.peripheral-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.peripheral-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    linear-gradient(
+      90deg,
+      rgb(var(--battery-rgb) / 0.22) 0 var(--battery-level),
+      transparent var(--battery-level) 100%
+    ),
+    radial-gradient(circle at 18% 0%, rgb(var(--battery-rgb) / 0.18), transparent 42%);
+  opacity: 0;
+  transition: opacity 180ms ease, background 180ms ease;
+}
+
+.peripheral-card.has-battery::before {
+  opacity: 1;
+}
+
+.peripheral-card.is-charging::after {
+  content: '';
+  position: absolute;
+  inset: -40% auto -40% -35%;
+  z-index: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.2), transparent);
+  transform: skewX(-16deg);
+  animation: battery-charge-sweep 2.2s ease-in-out infinite;
+}
+
+@keyframes battery-charge-sweep {
+  0% {
+    transform: skewX(-16deg) translateX(0);
+  }
+  100% {
+    transform: skewX(-16deg) translateX(380%);
+  }
+}
+</style>
