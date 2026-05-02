@@ -6,6 +6,10 @@ import { initializeTheme } from './lib/theme'
 
 initializeTheme()
 
+document.addEventListener('contextmenu', (event) => {
+  event.preventDefault()
+})
+
 const app = createApp(App)
 app.use(router)
 app.mount('#app')

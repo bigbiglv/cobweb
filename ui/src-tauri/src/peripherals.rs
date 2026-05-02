@@ -49,7 +49,7 @@ fn fetch_devices() -> Result<Vec<PeripheralDevice>, String> {
     cmd.args(&[
         "-NoProfile",
         "-Command",
-        r#"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and $_.Status -eq 'OK' -and ( $_.Class -in @('Keyboard','Mouse','XnaComposite') -or ($_.Class -eq 'HIDClass' -and $_.FriendlyName -match '(?i)(game controller|gamepad|controller|joystick|手柄|控制器)') ) -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|Oray|VHF|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"#
+        r#"[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-PnpDevice -PresentOnly | Where-Object { $_.FriendlyName -and $_.Status -eq 'OK' -and ( $_.Class -in @('Keyboard','Mouse','XnaComposite') -or ($_.Class -eq 'HIDClass' -and $_.FriendlyName -match '(?i)(game controller|gamepad|joystick|xinput|xbox|flydigi|飞智|手柄|游戏控制器)') ) -and $_.FriendlyName -notmatch '(?i)(Hub|Enumerator|Virtual|Composite|Host Controller|Root Hub|Endpoint|Oray|VHF|USB 虚拟|USB 复合|蓝牙枚举器|虚拟|集成|Integrated)' } | Select-Object InstanceId, Class, FriendlyName, Status | ConvertTo-Json -Compress"#
     ]);
 
     #[cfg(target_os = "windows")]
@@ -156,14 +156,13 @@ fn normalized_category(device: &PeripheralDevice) -> &'static str {
                 &[
                     "game controller",
                     "gamepad",
-                    "controller",
                     "joystick",
                     "xinput",
                     "xbox",
                     "flydigi",
                     "飞智",
                     "手柄",
-                    "控制器",
+                    "游戏控制器",
                 ],
             ) =>
         {
@@ -239,6 +238,11 @@ fn remove_auxiliary_hid_collections(devices: &mut Vec<PeripheralDevice>) {
                 .map(|class_type| class_type.eq_ignore_ascii_case("XnaComposite"))
                 .unwrap_or(false)
     });
+    let mouse_products = devices
+        .iter()
+        .filter(|device| normalized_category(device) == "mouse")
+        .map(product_key)
+        .collect::<Vec<_>>();
 
     devices.retain(|device| {
         let category = normalized_category(device);
@@ -254,7 +258,7 @@ fn remove_auxiliary_hid_collections(devices: &mut Vec<PeripheralDevice>) {
             return true;
         }
 
-        if is_logitech_device(device) && category == "keyboard" {
+        if is_logitech_auxiliary_keyboard(device, &mouse_products) {
             return false;
         }
         if has_flydigi_xinput && is_xbox_360_hid_game_controller(device) {
@@ -283,6 +287,17 @@ fn is_logitech_device(device: &PeripheralDevice) -> bool {
         .as_deref()
         .map(|id| id.to_ascii_uppercase().contains("VID_046D"))
         .unwrap_or(false)
+}
+
+fn is_logitech_auxiliary_keyboard(device: &PeripheralDevice, mouse_products: &[String]) -> bool {
+    if normalized_category(device) != "keyboard" || !is_logitech_device(device) {
+        return false;
+    }
+
+    let product = product_key(device);
+    product == "VID_046D&PID_C232"
+        || product == "VID_046D&PID_C547"
+        || mouse_products.iter().any(|mouse_product| mouse_product == &product)
 }
 
 fn is_rk_device(device: &PeripheralDevice) -> bool {

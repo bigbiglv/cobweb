@@ -57,7 +57,7 @@ struct XInputBatteryInformation {
 }
 
 #[link(name = "kernel32")]
-unsafe extern "system" {
+extern "system" {
     fn LoadLibraryA(name: *const c_char) -> HModule;
     fn GetProcAddress(module: HModule, name: *const c_char) -> FarProc;
     fn FreeLibrary(module: HModule) -> i32;

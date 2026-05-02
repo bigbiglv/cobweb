@@ -141,7 +141,7 @@ function getDeviceCategory(device: PeripheralDevice): DeviceCategory {
   }
 
   // HID 设备里控制器、键盘、鼠标都很常见，需要结合名称和实例 ID 再分类。
-  if (/(gamepad|controller|joystick|xinput|xbox|dualshock|dualsense|flydigi|飞智|手柄|控制器)/i.test(fingerprint)) {
+  if (/(game controller|gamepad|joystick|xinput|xbox|dualshock|dualsense|flydigi|飞智|手柄|游戏控制器)/i.test(fingerprint)) {
     return 'controller'
   }
   if (/(keyboard|键盘)/i.test(fingerprint)) {
