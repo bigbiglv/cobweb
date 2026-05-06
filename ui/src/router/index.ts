@@ -53,6 +53,15 @@ const router = createRouter({
             description: '将电源、音量与扩展能力集中在同一套语义化控制界面中。',
           },
         },
+        {
+          path: 'apple-music',
+          name: 'AppleMusic',
+          component: () => import('../views/apple-music/index.vue'),
+          meta: {
+            title: 'Apple Music',
+            description: '单独控制 Apple Music 播放、暂停和切歌。',
+          },
+        },
       ],
     },
   ],
