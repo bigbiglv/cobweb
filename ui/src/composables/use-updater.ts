@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { computed, markRaw, ref, shallowRef } from 'vue'
@@ -9,9 +10,15 @@ const downloading = ref(false)
 const installing = ref(false)
 const downloadedBytes = ref(0)
 const totalBytes = ref<number | null>(null)
+const autoUpdateEnabled = ref(true)
+const updateBehaviorPending = ref(false)
 
 interface CheckForUpdateOptions {
   notify?: boolean
+}
+
+interface UpdateBehavior {
+  autoUpdateEnabled: boolean
 }
 
 function isTauriRuntime() {
@@ -46,6 +53,36 @@ async function refreshUpdateInfo() {
   const update = await check()
   updateInfo.value = update ? markRaw(update) : null
   return updateInfo.value
+}
+
+async function loadUpdateBehavior() {
+  if (!isTauriRuntime()) {
+    return
+  }
+
+  const behavior = await invoke<UpdateBehavior>('get_update_behavior')
+  autoUpdateEnabled.value = behavior.autoUpdateEnabled
+}
+
+async function setAutoUpdateEnabled(enabled: boolean) {
+  autoUpdateEnabled.value = enabled
+
+  if (!isTauriRuntime()) {
+    return
+  }
+
+  updateBehaviorPending.value = true
+  try {
+    const behavior = await invoke<UpdateBehavior>('set_auto_update_enabled', {
+      enabled,
+    })
+    autoUpdateEnabled.value = behavior.autoUpdateEnabled
+  } catch (error) {
+    autoUpdateEnabled.value = !enabled
+    throw error
+  } finally {
+    updateBehaviorPending.value = false
+  }
 }
 
 async function checkForUpdate(options: CheckForUpdateOptions = {}) {
@@ -169,7 +206,11 @@ export function useUpdater() {
     downloadedBytes,
     totalBytes,
     downloadProgress,
+    autoUpdateEnabled,
+    updateBehaviorPending,
     hasUpdate: computed(() => updateInfo.value !== null),
+    loadUpdateBehavior,
+    setAutoUpdateEnabled,
     checkForUpdate,
     installUpdate,
   }

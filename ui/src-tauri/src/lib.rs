@@ -31,6 +31,7 @@ use tauri::{
     AppHandle, Emitter, Manager, RunEvent, Size, State, WebviewWindow, WebviewWindowBuilder,
     WindowEvent,
 };
+use tauri_plugin_updater::UpdaterExt;
 use tokio::time::MissedTickBehavior;
 
 const TRAY_MENU_SHOW: &str = "show";
@@ -65,6 +66,20 @@ struct CloseBehavior {
 #[serde(rename_all = "camelCase")]
 struct StartupBehavior {
     launch_on_startup: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateBehavior {
+    auto_update_enabled: bool,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct AppNotice {
+    title: String,
+    message: String,
+    tone: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -271,6 +286,119 @@ fn set_launch_on_startup(enabled: bool) -> Result<StartupBehavior, String> {
     })
 }
 
+#[tauri::command]
+fn get_update_behavior() -> UpdateBehavior {
+    let store = store::GLOBAL_STORE.lock().unwrap();
+    UpdateBehavior {
+        auto_update_enabled: store.data.auto_update_enabled,
+    }
+}
+
+#[tauri::command]
+fn set_auto_update_enabled(enabled: bool) -> UpdateBehavior {
+    let mut store = store::GLOBAL_STORE.lock().unwrap();
+    store.set_auto_update_enabled(enabled);
+    UpdateBehavior {
+        auto_update_enabled: enabled,
+    }
+}
+
+fn emit_app_notice(
+    app: &AppHandle,
+    title: impl Into<String>,
+    message: impl Into<String>,
+    tone: impl Into<String>,
+) {
+    let _ = app.emit(
+        "app_notice",
+        AppNotice {
+            title: title.into(),
+            message: message.into(),
+            tone: tone.into(),
+        },
+    );
+}
+
+async fn run_startup_auto_update(app: AppHandle, silent: bool) {
+    if cfg!(debug_assertions) {
+        return;
+    }
+
+    let auto_update_enabled = {
+        let store = store::GLOBAL_STORE.lock().unwrap();
+        store.data.auto_update_enabled
+    };
+
+    if !auto_update_enabled {
+        return;
+    }
+
+    let updater = match app.updater() {
+        Ok(updater) => updater,
+        Err(error) => {
+            log::error!("初始化自动更新失败: {}", error);
+            if !silent {
+                emit_app_notice(&app, "自动更新失败", error.to_string(), "warning");
+            }
+            return;
+        }
+    };
+
+    let update = match updater.check().await {
+        Ok(update) => update,
+        Err(error) => {
+            log::error!("检查自动更新失败: {}", error);
+            if !silent {
+                emit_app_notice(&app, "自动更新失败", error.to_string(), "warning");
+            }
+            return;
+        }
+    };
+
+    let Some(update) = update else {
+        return;
+    };
+
+    let version = update.version.clone();
+    if !silent {
+        emit_app_notice(
+            &app,
+            "发现新版本",
+            format!("正在后台更新到 {version}"),
+            "success",
+        );
+    }
+
+    let install_notice_app = app.clone();
+    let result = update
+        .download_and_install(
+            |_chunk_length, _content_length| {},
+            move || {
+                if !silent {
+                    emit_app_notice(
+                        &install_notice_app,
+                        "正在安装更新",
+                        "下载完成，应用即将重启",
+                        "success",
+                    );
+                }
+            },
+        )
+        .await;
+
+    if let Err(error) = result {
+        log::error!("自动安装更新失败: {}", error);
+        if !silent {
+            emit_app_notice(
+                &app,
+                "自动更新失败",
+                format!("{error}，可在设置中手动重试"),
+                "warning",
+            );
+        }
+    }
+}
+
 fn show_existing_main_window(app: &AppHandle) -> bool {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -438,6 +566,8 @@ pub fn run() {
             set_close_to_tray_on_close,
             get_startup_behavior,
             set_launch_on_startup,
+            get_update_behavior,
+            set_auto_update_enabled,
             remove_paired_client,
             ping_mobile_device,
             notify_mobile_disconnect
@@ -459,9 +589,18 @@ pub fn run() {
 
             scheduler::init(&app.handle().clone());
 
-            if !is_startup_hidden_launch() {
+            let startup_hidden_launch = is_startup_hidden_launch();
+
+            if !startup_hidden_launch {
                 create_main_window(app.handle())?;
             }
+
+            let updater_app = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                // 普通启动时等前端通知组件挂载，避免自动更新提示被过早丢弃。
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                run_startup_auto_update(updater_app, startup_hidden_launch).await;
+            });
 
             let tauri_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {

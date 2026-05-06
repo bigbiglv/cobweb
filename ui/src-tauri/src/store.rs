@@ -17,6 +17,10 @@ fn default_close_to_tray_on_close() -> bool {
     true
 }
 
+fn default_auto_update_enabled() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PairedClient {
     pub client_id: String,
@@ -83,6 +87,8 @@ pub struct AppConfig {
     pub mdns_enabled: bool,
     #[serde(default = "default_close_to_tray_on_close")]
     pub close_to_tray_on_close: bool,
+    #[serde(default = "default_auto_update_enabled")]
+    pub auto_update_enabled: bool,
 }
 
 impl Default for AppConfig {
@@ -99,6 +105,7 @@ impl Default for AppConfig {
             task_history: Vec::new(),
             mdns_enabled: true,
             close_to_tray_on_close: true,
+            auto_update_enabled: true,
         }
     }
 }
@@ -220,6 +227,11 @@ impl Store {
 
     pub fn set_close_to_tray_on_close(&mut self, enabled: bool) {
         self.data.close_to_tray_on_close = enabled;
+        self.save();
+    }
+
+    pub fn set_auto_update_enabled(&mut self, enabled: bool) {
+        self.data.auto_update_enabled = enabled;
         self.save();
     }
 }

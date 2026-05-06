@@ -13,7 +13,17 @@ defineOptions({ name: 'Navbar' })
 
 const route = useRoute()
 const { mode, toggleThemeMode } = useTheme()
-const { updateInfo, hasUpdate, downloading, installing, downloadProgress, checkForUpdate, installUpdate } = useUpdater()
+const {
+  updateInfo,
+  hasUpdate,
+  downloading,
+  installing,
+  downloadProgress,
+  autoUpdateEnabled,
+  loadUpdateBehavior,
+  checkForUpdate,
+  installUpdate,
+} = useUpdater()
 const settingsButtonRef = ref<HTMLElement | ComponentPublicInstance | null>(null)
 const settingsVisible = ref(false)
 const settingsSourceRect = ref<DOMRect | null>(null)
@@ -52,7 +62,13 @@ function handleSettingsClosed() {
   settingsVisible.value = false
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadUpdateBehavior()
+
+  if (autoUpdateEnabled.value) {
+    return
+  }
+
   void checkForUpdate()
   updateTimer = window.setInterval(() => {
     void checkForUpdate()

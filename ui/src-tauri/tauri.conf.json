@@ -30,7 +30,10 @@
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJBNjE0OEUzMkY1MkU1OUQKUldTZDVWSXY0MGhoS2lsTi9CYnVQdmhXa3ZmaGlmRjAwT1BxaFFvR3BPaUhCL0VIUEtwaUtQS2UK",
       "endpoints": [
         "https://github.com/bigbiglv/cobweb/releases/latest/download/latest.json"
-      ]
+      ],
+      "windows": {
+        "installMode": "quiet"
+      }
     }
   },
   "bundle": {

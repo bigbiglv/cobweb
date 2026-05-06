@@ -26,6 +26,7 @@ let hideTimer: number | null = null
 let unlistenConnected: UnlistenFn | null = null
 let unlistenDisconnected: UnlistenFn | null = null
 let unlistenFeatureNotice: UnlistenFn | null = null
+let unlistenNativeAppNotice: UnlistenFn | null = null
 let unlistenAppNotice: (() => void) | null = null
 
 function showNotice(
@@ -71,12 +72,17 @@ onMounted(async () => {
   unlistenFeatureNotice = await listen<FeatureNoticeEvent>('feature_notice', (event) => {
     showNotice(event.payload.message, event.payload.tone, event.payload.title)
   })
+
+  unlistenNativeAppNotice = await listen<FeatureNoticeEvent>('app_notice', (event) => {
+    showNotice(event.payload.message, event.payload.tone, event.payload.title)
+  })
 })
 
 onUnmounted(() => {
   unlistenConnected?.()
   unlistenDisconnected?.()
   unlistenFeatureNotice?.()
+  unlistenNativeAppNotice?.()
   unlistenAppNotice?.()
   if (hideTimer !== null) {
     window.clearTimeout(hideTimer)
