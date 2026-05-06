@@ -25,6 +25,7 @@ pub fn attach_battery_info(devices: &mut [PeripheralDevice]) {
     attach_logitech_hidpp_batteries(devices);
     attach_flydigi_batteries(devices);
     attach_royal_kludge_batteries(devices);
+    attach_standard_windows_batteries(devices);
 }
 
 fn attach_battery(device: &mut PeripheralDevice, battery: &BatteryInfo) {

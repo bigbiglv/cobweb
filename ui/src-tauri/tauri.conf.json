@@ -10,7 +10,17 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "windows": [],
+    "windows": [
+      {
+        "label": "main",
+        "title": "Cobweb",
+        "width": 1100,
+        "height": 760,
+        "center": true,
+        "resizable": true,
+        "create": false
+      }
+    ],
     "security": {
       "csp": null
     }

@@ -25,9 +25,11 @@ use std::sync::{
 };
 use std::time::Duration;
 use tauri::{
+    LogicalSize,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, Manager, RunEvent, Size, State, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
 };
 use tokio::time::MissedTickBehavior;
 
@@ -187,6 +189,19 @@ fn is_startup_hidden_launch() -> bool {
     env::args_os().any(|arg| arg == STARTUP_ARG_HIDDEN)
 }
 
+fn apply_configured_main_window_layout(app: &AppHandle, window: &WebviewWindow) {
+    if let Some(config) = app.config().app.windows.iter().find(|window| window.label == "main") {
+        let _ = window.set_size(Size::Logical(LogicalSize {
+            width: config.width,
+            height: config.height,
+        }));
+
+        if config.center {
+            let _ = window.center();
+        }
+    }
+}
+
 #[cfg(target_os = "windows")]
 fn startup_command() -> Result<String, String> {
     let exe_path = env::current_exe().map_err(|error| format!("读取程序路径失败: {error}"))?;
@@ -260,6 +275,7 @@ fn show_existing_main_window(app: &AppHandle) -> bool {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
+        apply_configured_main_window_layout(app, &window);
         let _ = window.set_focus();
         return true;
     }
@@ -273,12 +289,15 @@ fn create_main_window(app: &AppHandle) -> tauri::Result<()> {
     }
 
     // 托盘状态下销毁 WebView，重新打开时按需创建，避免隐藏页面继续运行前端脚本。
-    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
-        .title("Cobweb")
-        .inner_size(800.0, 600.0)
-        .resizable(true)
-        .visible(true)
-        .build()?;
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+        .expect("missing main window config");
+    let window = WebviewWindowBuilder::from_config(app, config)?.build()?;
+    apply_configured_main_window_layout(app, &window);
     let _ = window.set_focus();
     Ok(())
 }
