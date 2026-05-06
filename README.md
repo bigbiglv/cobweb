@@ -2,6 +2,10 @@
 
 Cobweb PC 端桌面应用，基于 Rust、Tauri 2 和 Vue 3 开发。
 
+## 文档
+
+- [Web 控制接口文档](docs/web-control-api.md)：说明 WebSocket 和 HTTP API 两种 Web 控制 PC 的调用方式，以及每种指令对应的功能。
+
 ## 目录说明
 
 ```text
