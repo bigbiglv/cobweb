@@ -140,10 +140,10 @@ pub fn open_apple_music() -> Result<(), MediaControlError> {
             MediaControlError::CommandFailed(format!("打开 Apple Music 失败: {error}"))
         })?;
 
-        if status.success() {
-            // Note 9: explorer 启动成功只代表命令已发出，不代表媒体会话马上可用。
-            // 这里短暂等待进程出现，减少前端立刻刷新时看到旧状态的概率。
-            wait_for_apple_music_running(Duration::from_secs(5));
+        // Note 9: explorer 有时会返回 1，但 Store 应用已经被正常拉起。
+        // 所以先看 Apple Music 进程是否出现，再决定是否把退出码当作失败。
+        let app_running = wait_for_apple_music_running(Duration::from_secs(5));
+        if status.success() || app_running {
             Ok(())
         } else {
             Err(MediaControlError::CommandFailed(format!(

@@ -25,11 +25,10 @@ use std::sync::{
 };
 use std::time::Duration;
 use tauri::{
-    LogicalSize,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, RunEvent, Size, State, WebviewWindow, WebviewWindowBuilder,
-    WindowEvent,
+    AppHandle, Emitter, LogicalSize, Manager, RunEvent, Size, State, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_updater::UpdaterExt;
 use tokio::time::MissedTickBehavior;
@@ -88,6 +87,12 @@ struct WebConsoleStatus {
     running: bool,
     port: Option<u16>,
     urls: Vec<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StartupAutoUpdateResult {
+    Finished,
+    RetryableFailure,
 }
 
 fn current_mdns_enabled() -> bool {
@@ -205,7 +210,13 @@ fn is_startup_hidden_launch() -> bool {
 }
 
 fn apply_configured_main_window_layout(app: &AppHandle, window: &WebviewWindow) {
-    if let Some(config) = app.config().app.windows.iter().find(|window| window.label == "main") {
+    if let Some(config) = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|window| window.label == "main")
+    {
         let _ = window.set_size(Size::Logical(LogicalSize {
             width: config.width,
             height: config.height,
@@ -320,8 +331,22 @@ fn emit_app_notice(
 }
 
 async fn run_startup_auto_update(app: AppHandle, silent: bool) {
+    let max_attempts = if silent { 3 } else { 1 };
+
+    for attempt in 1..=max_attempts {
+        let result = run_startup_auto_update_once(app.clone(), silent).await;
+        if result == StartupAutoUpdateResult::Finished || attempt == max_attempts {
+            return;
+        }
+
+        // 开机后台启动时网络服务可能还没准备好，静默重试可以提高首轮自动更新成功率。
+        tokio::time::sleep(Duration::from_secs(30)).await;
+    }
+}
+
+async fn run_startup_auto_update_once(app: AppHandle, silent: bool) -> StartupAutoUpdateResult {
     if cfg!(debug_assertions) {
-        return;
+        return StartupAutoUpdateResult::Finished;
     }
 
     let auto_update_enabled = {
@@ -330,7 +355,7 @@ async fn run_startup_auto_update(app: AppHandle, silent: bool) {
     };
 
     if !auto_update_enabled {
-        return;
+        return StartupAutoUpdateResult::Finished;
     }
 
     let updater = match app.updater() {
@@ -340,7 +365,7 @@ async fn run_startup_auto_update(app: AppHandle, silent: bool) {
             if !silent {
                 emit_app_notice(&app, "自动更新失败", error.to_string(), "warning");
             }
-            return;
+            return StartupAutoUpdateResult::RetryableFailure;
         }
     };
 
@@ -351,12 +376,12 @@ async fn run_startup_auto_update(app: AppHandle, silent: bool) {
             if !silent {
                 emit_app_notice(&app, "自动更新失败", error.to_string(), "warning");
             }
-            return;
+            return StartupAutoUpdateResult::RetryableFailure;
         }
     };
 
     let Some(update) = update else {
-        return;
+        return StartupAutoUpdateResult::Finished;
     };
 
     let version = update.version.clone();
@@ -386,15 +411,26 @@ async fn run_startup_auto_update(app: AppHandle, silent: bool) {
         )
         .await;
 
-    if let Err(error) = result {
-        log::error!("自动安装更新失败: {}", error);
-        if !silent {
-            emit_app_notice(
-                &app,
-                "自动更新失败",
-                format!("{error}，可在设置中手动重试"),
-                "warning",
-            );
+    match result {
+        Ok(()) => {
+            log::info!("自动更新已安装，准备重启应用");
+            app.state::<ExitState>()
+                .allowed
+                .store(true, Ordering::SeqCst);
+            app.request_restart();
+            StartupAutoUpdateResult::Finished
+        }
+        Err(error) => {
+            log::error!("自动安装更新失败: {}", error);
+            if !silent {
+                emit_app_notice(
+                    &app,
+                    "自动更新失败",
+                    format!("{error}，可在设置中手动重试"),
+                    "warning",
+                );
+            }
+            StartupAutoUpdateResult::RetryableFailure
         }
     }
 }
@@ -598,7 +634,9 @@ pub fn run() {
             let updater_app = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 // 普通启动时等前端通知组件挂载，避免自动更新提示被过早丢弃。
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                if !startup_hidden_launch {
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
                 run_startup_auto_update(updater_app, startup_hidden_launch).await;
             });
 
@@ -628,10 +666,8 @@ pub fn run() {
                             }
                         }
 
-                        let _ = tauri_app.emit(
-                            "web_console_status_changed",
-                            web_console_status_value(),
-                        );
+                        let _ = tauri_app
+                            .emit("web_console_status_changed", web_console_status_value());
                     }
                     Err(error) => {
                         log::error!("Failed to start Axum server: {}", error);
@@ -680,7 +716,14 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
-            if let RunEvent::ExitRequested { api, .. } = event {
+            if let RunEvent::ExitRequested { api, code, .. } = event {
+                if code == Some(tauri::RESTART_EXIT_CODE) {
+                    app.state::<ExitState>()
+                        .allowed
+                        .store(true, Ordering::SeqCst);
+                    return;
+                }
+
                 let allowed = app.state::<ExitState>().allowed.load(Ordering::SeqCst);
                 if !allowed {
                     api.prevent_exit();

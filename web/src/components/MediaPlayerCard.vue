@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ActionIconButton from "./ActionIconButton.vue";
-import { iconForMediaAction } from "../lib/featureIcons";
+import { iconForMediaActionState, labelForMediaAction } from "../lib/featureIcons";
 import type { AppleMusicTrackInfo, FeatureDefinition, FeatureSnapshot, MediaPlayerAction } from "../types";
 
 const {
@@ -74,8 +74,8 @@ function actionState(action: MediaPlayerAction) {
       <ActionIconButton
         v-for="action in feature.control.actions"
         :key="action.featureKey"
-        :icon="iconForMediaAction(action)"
-        :label="actionState(action) === 'running' ? '停止' : action.label"
+        :icon="iconForMediaActionState(action, snapshot?.appleMusicPlaybackState, snapshot?.appleMusicTrack)"
+        :label="actionState(action) === 'running' ? '停止' : labelForMediaAction(action, snapshot?.appleMusicPlaybackState, snapshot?.appleMusicTrack)"
         :state="actionState(action)"
         :disabled="actionState(action) === 'running'"
         @click="$emit('runAction', feature, action)"

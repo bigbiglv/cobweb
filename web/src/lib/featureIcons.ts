@@ -1,5 +1,5 @@
 import type { ButtonIconName } from "./buttonIcons";
-import type { MediaPlayerAction } from "../types";
+import type { AppleMusicTrackInfo, MediaPlayerAction } from "../types";
 
 export function iconForFeature(featureKey: string): ButtonIconName {
   if (featureKey === "shutdown") return "power";
@@ -11,9 +11,44 @@ export function iconForFeature(featureKey: string): ButtonIconName {
 }
 
 export function iconForMediaAction(action: MediaPlayerAction): ButtonIconName {
+  return iconForMediaActionState(action);
+}
+
+function hasAppleMusicTrack(track: AppleMusicTrackInfo | null | undefined) {
+  return Boolean(track?.title || track?.artist || track?.album || track?.durationMs);
+}
+
+function isPlayPauseAction(action: MediaPlayerAction) {
+  return action.featureKey.endsWith("_play_pause");
+}
+
+function isActionPlaying(
+  action: MediaPlayerAction,
+  playbackState?: string | null,
+  track?: AppleMusicTrackInfo | null,
+) {
+  if (!isPlayPauseAction(action)) return false;
+  if (playbackState === "playing") return hasAppleMusicTrack(track);
+  if (playbackState === "paused" || playbackState === "stopped" || playbackState === "unavailable") return false;
+  return action.label === "暂停";
+}
+
+export function iconForMediaActionState(
+  action: MediaPlayerAction,
+  playbackState?: string | null,
+  track?: AppleMusicTrackInfo | null,
+): ButtonIconName {
   if (action.featureKey.endsWith("_previous")) return "skipBack";
   if (action.featureKey.endsWith("_next")) return "skipForward";
-  if (action.featureKey.endsWith("_play_pause") && action.label === "播放") return "play";
-  if (action.featureKey.endsWith("_play_pause")) return "pause";
+  if (isPlayPauseAction(action)) return isActionPlaying(action, playbackState, track) ? "pause" : "play";
   return "music";
+}
+
+export function labelForMediaAction(
+  action: MediaPlayerAction,
+  playbackState?: string | null,
+  track?: AppleMusicTrackInfo | null,
+) {
+  if (!isPlayPauseAction(action)) return action.label;
+  return isActionPlaying(action, playbackState, track) ? "暂停" : "播放";
 }

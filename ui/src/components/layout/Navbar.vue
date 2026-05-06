@@ -65,7 +65,7 @@ function handleSettingsClosed() {
 onMounted(async () => {
   await loadUpdateBehavior()
 
-  if (autoUpdateEnabled.value) {
+  if (!autoUpdateEnabled.value) {
     return
   }
 
