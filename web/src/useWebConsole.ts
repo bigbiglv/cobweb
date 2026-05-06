@@ -3,14 +3,18 @@ import { cancelScheduledTask, createScheduledTask, executeCommand, fetchState, g
 import type {
   ConnectionStatus,
   FeatureCommand,
-  FeatureExecuteResponse,
   FeatureDefinition,
+  FeatureExecuteResponse,
   FeatureGroup,
   FeatureSnapshot,
   ScheduledTask,
   TaskHistoryEntry,
   WebStateResponse,
 } from "./types";
+
+interface WebConsoleOptions {
+  confirmAction?: (feature: FeatureDefinition) => Promise<boolean> | boolean;
+}
 
 function createRequestId() {
   const cryptoApi = globalThis.crypto;
@@ -45,13 +49,14 @@ const statusLabels: Record<string, string> = {
   manual_failed: "手动失败",
 };
 
-export function useWebConsole() {
+export function useWebConsole(options: WebConsoleOptions = {}) {
   const groups = ref<FeatureGroup[]>([]);
   const snapshot = ref<FeatureSnapshot | null>(null);
   const tasks = ref<ScheduledTask[]>([]);
   const history = ref<TaskHistoryEntry[]>([]);
   const activeTab = ref<"actions" | "schedules" | "history">("actions");
   const activeFeatureKey = ref("");
+  const completedFeatureKey = ref("");
   const selectedFeatureKey = ref("");
   const taskVolume = ref(50);
   const taskDelayMinutes = ref(5);
@@ -62,6 +67,7 @@ export function useWebConsole() {
   const now = ref(Date.now());
 
   let toastTimer = 0;
+  let completedTimer = 0;
   let reconnectTimer = 0;
   let heartbeatTimer = 0;
   let clockTimer = 0;
@@ -112,6 +118,16 @@ export function useWebConsole() {
     connectionDetail.value = detail;
   }
 
+  function markFeatureCompleted(featureKey: string) {
+    completedFeatureKey.value = featureKey;
+    window.clearTimeout(completedTimer);
+    completedTimer = window.setTimeout(() => {
+      if (completedFeatureKey.value === featureKey) {
+        completedFeatureKey.value = "";
+      }
+    }, 900);
+  }
+
   function commandForFeature(feature: FeatureDefinition, level?: number): FeatureCommand {
     if (feature.featureKey === "volume") {
       return { feature: "volume", level: Number(level ?? snapshot.value?.volumeLevel ?? 0) };
@@ -151,8 +167,12 @@ export function useWebConsole() {
   }
 
   async function runFeature(feature: FeatureDefinition, level?: number) {
-    if (feature.control.type === "action" && feature.control.confirmRequired) {
-      const confirmed = window.confirm(`确认执行“${feature.title}”吗？`);
+    const requiresConfirm = feature.featureKey === "shutdown"
+      || feature.featureKey === "restart"
+      || (feature.control.type === "action" && feature.control.confirmRequired);
+
+    if (requiresConfirm) {
+      const confirmed = await (options.confirmAction?.(feature) ?? true);
       if (!confirmed) {
         return;
       }
@@ -181,6 +201,7 @@ export function useWebConsole() {
         };
         await refreshState(true);
       }
+      markFeatureCompleted(feature.featureKey);
       showToast(payload.msg || "已执行");
     } catch (error) {
       showToast(String(error instanceof Error ? error.message : error));
@@ -320,6 +341,7 @@ export function useWebConsole() {
   onUnmounted(() => {
     socket?.close();
     window.clearTimeout(toastTimer);
+    window.clearTimeout(completedTimer);
     window.clearTimeout(reconnectTimer);
     window.clearInterval(heartbeatTimer);
     window.clearInterval(clockTimer);
@@ -330,6 +352,7 @@ export function useWebConsole() {
     activeTab,
     actionFeatures,
     cancelTask,
+    completedFeatureKey,
     connectionDetail,
     connectionStatus,
     countdownText,

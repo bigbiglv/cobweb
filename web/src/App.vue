@@ -1,37 +1,27 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import {
-  AlertTriangle,
-  Bell,
-  CheckCircle2,
-  Clock3,
-  History,
-  LoaderCircle,
-  Moon,
-  Music,
-  Pause,
-  Play,
-  Power,
-  RefreshCw,
-  RotateCcw,
-  SkipBack,
-  SkipForward,
-  Square,
-  Sun,
-  Volume2,
-  Zap,
-} from "lucide-vue-next";
-import { useTheme } from "./useTheme";
+import { ref } from "vue";
+import ActionIconButton from "./components/ActionIconButton.vue";
+import AppConfirmDialog from "./components/AppConfirmDialog.vue";
+import AppToast from "./components/AppToast.vue";
+import FeatureActionCard from "./components/FeatureActionCard.vue";
+import MediaPlayerCard from "./components/MediaPlayerCard.vue";
+import { useConfirmDialog } from "./composables/useConfirmDialog";
 import { useWebConsole } from "./useWebConsole";
-import type { AppleMusicTrackInfo, FeatureDefinition, MediaPlayerAction } from "./types";
+import type { FeatureDefinition, MediaPlayerAction } from "./types";
+
+const {
+  dialog,
+  confirm,
+  cancelConfirm,
+  acceptConfirm,
+} = useConfirmDialog();
 
 const {
   activeFeatureKey,
   activeTab,
   actionFeatures,
   cancelTask,
-  connectionDetail,
-  connectionStatus,
+  completedFeatureKey,
   countdownText,
   formatDate,
   mediaPlayerFeatures,
@@ -50,46 +40,69 @@ const {
   toast,
   visibleHistory,
   snapshot,
-} = useWebConsole();
-const { resolvedMode, toggleThemeMode } = useTheme();
+} = useWebConsole({
+  confirmAction: (feature) => confirm({
+    title: `确认${feature.title}`,
+    message: `${feature.title}属于高风险系统操作，确认后会立即执行，请再次确认。`,
+    confirmText: feature.title,
+    danger: feature.featureKey === "shutdown"
+      || feature.featureKey === "restart"
+      || (feature.control.type === "action" && feature.control.tone === "danger"),
+  }),
+});
+
+const mediaRefreshState = ref<"idle" | "running" | "done">("idle");
+const volumeRefreshState = ref<"idle" | "running" | "done">("idle");
+let mediaRefreshDoneTimer = 0;
+let volumeRefreshDoneTimer = 0;
 
 const navItems = [
-  { key: "actions", label: "操作", icon: Zap },
-  { key: "schedules", label: "定时", icon: Clock3 },
-  { key: "history", label: "历史", icon: History },
+  { key: "actions", label: "操作", icon: "zap" },
+  { key: "schedules", label: "定时", icon: "clock" },
+  { key: "history", label: "历史", icon: "history" },
 ] as const;
 
-const connectionAriaLabel = computed(() => {
-  if (connectionStatus.value === "connected") {
-    return `已连接，${connectionDetail.value}`;
-  }
-  if (connectionStatus.value === "offline") {
-    return `已断开，${connectionDetail.value}`;
-  }
-  return `连接中，${connectionDetail.value}`;
-});
-
-const connectionIcon = computed(() => {
-  if (connectionStatus.value === "connected") return CheckCircle2;
-  if (connectionStatus.value === "offline") return AlertTriangle;
-  return LoaderCircle;
-});
-
-function iconForFeature(featureKey: string) {
-  if (featureKey === "shutdown") return Power;
-  if (featureKey === "restart") return RotateCcw;
-  if (featureKey === "volume") return Volume2;
-  if (featureKey === "apple_music_open") return Music;
-  if (featureKey === "error_test") return AlertTriangle;
-  return Bell;
+function actionState(featureKey: string) {
+  if (activeFeatureKey.value === featureKey) return "running";
+  if (completedFeatureKey.value === featureKey) return "done";
+  return "idle";
 }
 
-function iconForMediaAction(action: MediaPlayerAction) {
-  if (action.featureKey.endsWith("_previous")) return SkipBack;
-  if (action.featureKey.endsWith("_next")) return SkipForward;
-  if (action.featureKey.endsWith("_play_pause") && action.label === "播放") return Play;
-  if (action.featureKey.endsWith("_play_pause")) return Pause;
-  return Music;
+async function runCardRefresh(targetState: typeof mediaRefreshState, clearDoneTimer: () => void, setDoneTimer: () => void) {
+  if (targetState.value === "running") return;
+
+  targetState.value = "running";
+  clearDoneTimer();
+  try {
+    await refreshState();
+    targetState.value = "done";
+  } finally {
+    setDoneTimer();
+  }
+}
+
+function refreshMediaCard() {
+  runCardRefresh(
+    mediaRefreshState,
+    () => window.clearTimeout(mediaRefreshDoneTimer),
+    () => {
+      mediaRefreshDoneTimer = window.setTimeout(() => {
+        mediaRefreshState.value = "idle";
+      }, 900);
+    },
+  );
+}
+
+function refreshVolumeCard() {
+  runCardRefresh(
+    volumeRefreshState,
+    () => window.clearTimeout(volumeRefreshDoneTimer),
+    () => {
+      volumeRefreshDoneTimer = window.setTimeout(() => {
+        volumeRefreshState.value = "idle";
+      }, 900);
+    },
+  );
 }
 
 function runMediaAction(feature: FeatureDefinition, action: MediaPlayerAction) {
@@ -100,38 +113,14 @@ function runMediaAction(feature: FeatureDefinition, action: MediaPlayerAction) {
   });
 }
 
-function formatTime(ms: number | null | undefined) {
-  if (typeof ms !== "number") return "--:--";
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-}
-
-function progressPercent(track: AppleMusicTrackInfo | null | undefined) {
-  if (!track?.positionMs || !track.durationMs) return 0;
-  return Math.min(100, Math.max(0, (track.positionMs / track.durationMs) * 100));
-}
-
 function sourceName(name: string | null | undefined) {
-  return (name || "未知来源").replace("Web 鎺у埗鍙?", "Web 控制台");
+  return name || "未知来源";
 }
 </script>
 
 <template>
   <div class="app-shell">
-    <header class="topbar">
-      <div class="connection-card" :class="connectionStatus" :aria-label="connectionAriaLabel" aria-live="polite">
-        <component :is="connectionIcon" class="connection-icon" :class="[connectionStatus, { spin: connectionStatus === 'connecting' }]" />
-        <button class="icon-button connection-refresh" type="button" aria-label="刷新" @click="refreshState()">
-          <RefreshCw class="button-icon" />
-        </button>
-      </div>
-
-      <button class="icon-button nav-action" type="button" aria-label="切换主题" @click="toggleThemeMode">
-        <component :is="resolvedMode === 'dark' ? Sun : Moon" class="button-icon" />
-      </button>
-    </header>
+    <!-- <header class="topbar"> 暂时隐藏顶栏，后续需要连接状态或主题切换时再恢复。 -->
 
     <nav class="section-nav" aria-label="控制台导航">
       <div class="section-nav-inner">
@@ -143,7 +132,7 @@ function sourceName(name: string | null | undefined) {
           type="button"
           @click="activeTab = item.key"
         >
-          <component :is="item.icon" class="nav-icon" />
+          <ActionIconButton :icon="item.icon" :label="item.label" decorative />
           {{ item.label }}
         </button>
       </div>
@@ -152,79 +141,25 @@ function sourceName(name: string | null | undefined) {
     <main class="workspace">
       <section v-show="activeTab === 'actions'" class="page">
         <div v-if="actionFeatures.length || mediaPlayerFeatures.length" class="action-grid">
-          <article v-for="feature in actionFeatures" :key="feature.featureKey" class="control-card action-card">
-            <div class="action-card-main">
-              <div class="feature-icon" :class="{ danger: feature.control.type === 'action' && feature.control.tone === 'danger' }">
-                <component :is="iconForFeature(feature.featureKey)" />
-              </div>
-              <div class="feature-title">{{ feature.title }}</div>
-            </div>
-            <button
-              class="primary-button action-run-button"
-              :class="{
-                danger: feature.control.type === 'action' && feature.control.tone === 'danger',
-                running: activeFeatureKey === feature.featureKey,
-              }"
-              type="button"
-              :disabled="activeFeatureKey === feature.featureKey"
-              :aria-label="activeFeatureKey === feature.featureKey ? '执行中' : feature.title"
-              @click="runFeature(feature)"
-            >
-              <LoaderCircle v-if="activeFeatureKey === feature.featureKey" class="button-icon spin action-progress" />
-              <Square v-if="activeFeatureKey === feature.featureKey" class="button-icon action-stop-icon" />
-              <component :is="iconForFeature(feature.featureKey)" v-else class="button-icon" />
-            </button>
-          </article>
+          <FeatureActionCard
+            v-for="feature in actionFeatures"
+            :key="feature.featureKey"
+            :feature="feature"
+            :action-state="actionState(feature.featureKey)"
+            @run="runFeature"
+          />
 
-          <article v-for="feature in mediaPlayerFeatures" :key="feature.featureKey" class="control-card media-card">
-            <div class="volume-head">
-              <div class="action-card-main">
-                <div class="feature-icon media-artwork">
-                  <img
-                    v-if="snapshot?.appleMusicTrack?.artworkDataUrl"
-                    :src="snapshot.appleMusicTrack.artworkDataUrl"
-                    alt=""
-                  >
-                  <Music v-else />
-                </div>
-                <div class="media-title-block">
-                  <div class="feature-title">{{ snapshot?.appleMusicTrack?.title || feature.title }}</div>
-                  <div v-if="snapshot?.appleMusicTrack?.artist || snapshot?.appleMusicTrack?.album" class="list-row-meta">
-                    {{ [snapshot?.appleMusicTrack?.artist, snapshot?.appleMusicTrack?.album].filter(Boolean).join(" · ") }}
-                  </div>
-                </div>
-              </div>
-              <button class="secondary-button media-refresh" type="button" aria-label="刷新" @click="refreshState()">
-                <RefreshCw class="button-icon" />
-              </button>
-            </div>
-
-            <div v-if="snapshot?.appleMusicTrack?.positionMs || snapshot?.appleMusicTrack?.durationMs" class="media-progress">
-              <div class="media-progress-track">
-                <div class="media-progress-value" :style="{ width: `${progressPercent(snapshot?.appleMusicTrack)}%` }" />
-              </div>
-              <div class="media-time-row">
-                <span>{{ formatTime(snapshot?.appleMusicTrack?.positionMs) }}</span>
-                <span>{{ formatTime(snapshot?.appleMusicTrack?.durationMs) }}</span>
-              </div>
-            </div>
-
-            <div v-if="feature.control.type === 'mediaPlayer'" class="media-actions">
-              <button
-                v-for="action in feature.control.actions"
-                :key="action.featureKey"
-                class="secondary-button media-button"
-                :class="{ running: activeFeatureKey === action.featureKey }"
-                type="button"
-                :disabled="activeFeatureKey === action.featureKey"
-                :aria-label="action.label"
-                @click="runMediaAction(feature, action)"
-              >
-                <LoaderCircle v-if="activeFeatureKey === action.featureKey" class="button-icon spin" />
-                <component :is="iconForMediaAction(action)" v-else class="button-icon" />
-              </button>
-            </div>
-          </article>
+          <MediaPlayerCard
+            v-for="feature in mediaPlayerFeatures"
+            :key="feature.featureKey"
+            :feature="feature"
+            :snapshot="snapshot"
+            :pending-key="activeFeatureKey"
+            :completed-key="completedFeatureKey"
+            :refresh-state="mediaRefreshState"
+            @refresh="refreshMediaCard"
+            @run-action="runMediaAction"
+          />
         </div>
         <div v-else class="empty-state">暂无功能</div>
 
@@ -232,11 +167,20 @@ function sourceName(name: string | null | undefined) {
           <div class="volume-head">
             <div class="action-card-main">
               <div class="feature-icon">
-                <component :is="iconForFeature(feature.featureKey)" />
+                <ActionIconButton icon="volume" :label="feature.title" decorative />
               </div>
               <div class="feature-title">{{ feature.title }}</div>
             </div>
-            <div class="volume-value">{{ snapshot?.volumeLevel ?? taskVolume }}{{ feature.control.type === "range" ? feature.control.unit : "%" }}</div>
+            <div class="volume-tools">
+              <div class="volume-value">{{ snapshot?.volumeLevel ?? taskVolume }}{{ feature.control.type === "range" ? feature.control.unit : "%" }}</div>
+              <ActionIconButton
+                icon="refresh"
+                label="刷新音量"
+                :state="volumeRefreshState"
+                floating
+                @click="refreshVolumeCard"
+              />
+            </div>
           </div>
           <input
             v-if="feature.control.type === 'range'"
@@ -295,9 +239,7 @@ function sourceName(name: string | null | undefined) {
             </div>
             <div class="list-row-actions">
               <span class="status-badge queued">待执行</span>
-              <button class="secondary-button" type="button" aria-label="停止任务" @click="cancelTask(task.taskId)">
-                <Square class="button-icon" />
-              </button>
+              <ActionIconButton icon="stop" label="停止任务" @click="cancelTask(task.taskId)" />
             </div>
           </article>
         </div>
@@ -308,7 +250,7 @@ function sourceName(name: string | null | undefined) {
         <div v-if="visibleHistory.length" class="list-stack">
           <article v-for="entry in visibleHistory" :key="`${entry.taskId ?? 'manual'}-${entry.recordedAtMs}`" class="list-row">
             <span class="status-badge" :class="entry.status">
-              <CheckCircle2 class="badge-icon" />
+              <ActionIconButton icon="check" label="完成" decorative />
               {{ statusLabels[entry.status] ?? entry.status }}
             </span>
             <div class="list-row-main">
@@ -322,8 +264,17 @@ function sourceName(name: string | null | undefined) {
       </section>
     </main>
 
-    <div class="toast" :class="{ visible: toast }" role="status" aria-live="polite">
-      {{ toast }}
-    </div>
+    <AppToast :message="toast" />
+
+    <AppConfirmDialog
+      :open="dialog.open"
+      :title="dialog.title"
+      :message="dialog.message"
+      :confirm-text="dialog.confirmText"
+      :cancel-text="dialog.cancelText"
+      :danger="dialog.danger"
+      @cancel="cancelConfirm"
+      @confirm="acceptConfirm"
+    />
   </div>
 </template>

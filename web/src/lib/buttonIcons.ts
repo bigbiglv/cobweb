@@ -1,0 +1,45 @@
+export type ButtonIconName =
+  | "alert"
+  | "bell"
+  | "check"
+  | "clock"
+  | "history"
+  | "moon"
+  | "music"
+  | "pause"
+  | "play"
+  | "power"
+  | "refresh"
+  | "restart"
+  | "skipBack"
+  | "skipForward"
+  | "stop"
+  | "sun"
+  | "volume"
+  | "zap";
+
+// 单 path 图标用于 MorphSVG 统一执行前、执行中、执行完成的变形动画。
+const iconPaths: Record<ButtonIconName, string> = {
+  alert: "M12 3L22 20H2L12 3ZM11 8V13H13V8H11ZM11 16V18H13V16H11Z",
+  bell: "M12 22A3 3 0 0 0 15 19H9A3 3 0 0 0 12 22ZM5 17H19L17 15V10A5 5 0 0 0 13 5.1V3H11V5.1A5 5 0 0 0 7 10V15L5 17Z",
+  check: "M9.2 16.6L4.9 12.3L3.5 13.7L9.2 19.4L21 7.6L19.6 6.2L9.2 16.6Z",
+  clock: "M12 2A10 10 0 1 0 12 22A10 10 0 0 0 12 2ZM13 7H11V13L16 16L17 14.3L13 12V7Z",
+  history: "M12 4A8 8 0 1 1 5.2 16.2L3.4 17.1A10 10 0 1 0 4 7.4V4H2V11H9V9H5.3A8 8 0 0 1 12 4ZM11 7V13L16 16L17 14.3L13 12V7H11Z",
+  moon: "M21 14.4A8 8 0 0 1 9.6 3A9 9 0 1 0 21 14.4Z",
+  music: "M18 3V14.2A3 3 0 1 1 16 11.4V7H9V16.2A3 3 0 1 1 7 13.4V5L18 3Z",
+  pause: "M7 5H10V19H7V5ZM14 5H17V19H14V5Z",
+  play: "M7 4L20 12L7 20V4Z",
+  power: "M11 2H13V12H11V2ZM7.05 5.64L8.46 7.05A6 6 0 1 0 15.54 7.05L16.95 5.64A8 8 0 1 1 7.05 5.64Z",
+  refresh: "M17.7 6.3A8 8 0 0 0 4.1 10H2L5 14L8 10H6.2A6 6 0 0 1 16.3 7.7L17.7 6.3ZM19 10L16 14H17.8A6 6 0 0 1 7.7 16.3L6.3 17.7A8 8 0 0 0 19.9 14H22L19 10Z",
+  restart: "M17.7 6.3A8 8 0 1 0 20 12H18A6 6 0 1 1 16.3 7.7L13 11H21V3L17.7 6.3Z",
+  skipBack: "M5 5H7V19H5V5ZM9 12L19 5V19L9 12Z",
+  skipForward: "M17 5H19V19H17V5ZM5 5L15 12L5 19V5Z",
+  stop: "M7 7H17V17H7V7Z",
+  sun: "M11 1H13V4H11V1ZM11 20H13V23H11V20ZM4.2 2.8L6.3 4.9L4.9 6.3L2.8 4.2L4.2 2.8ZM19.1 17.7L21.2 19.8L19.8 21.2L17.7 19.1L19.1 17.7ZM1 11H4V13H1V11ZM20 11H23V13H20V11ZM2.8 19.8L4.9 17.7L6.3 19.1L4.2 21.2L2.8 19.8ZM17.7 4.9L19.8 2.8L21.2 4.2L19.1 6.3L17.7 4.9ZM12 6A6 6 0 1 0 12 18A6 6 0 0 0 12 6Z",
+  volume: "M4 9V15H8L13 20V4L8 9H4ZM16.5 8.5L15.1 9.9A3 3 0 0 1 15.1 14.1L16.5 15.5A5 5 0 0 0 16.5 8.5ZM19.3 5.7L17.9 7.1A7 7 0 0 1 17.9 16.9L19.3 18.3A9 9 0 0 0 19.3 5.7Z",
+  zap: "M13 2L4 14H11L10 22L20 9H13L13 2Z",
+};
+
+export function getButtonIconPath(name: ButtonIconName) {
+  return iconPaths[name] ?? iconPaths.bell;
+}
