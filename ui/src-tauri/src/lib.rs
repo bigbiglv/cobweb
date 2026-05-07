@@ -16,6 +16,7 @@ use crate::network::server::{
     cleanup_stale_presence, disconnect_client_session, get_clients_with_status,
     notify_mobile_disconnect, ping_mobile_device, SessionEvent,
 };
+use cobweb_control::audio::AudioOutputDevice;
 use mdns_sd::ServiceDaemon;
 use serde::Serialize;
 use std::env;
@@ -71,6 +72,14 @@ struct StartupBehavior {
 #[serde(rename_all = "camelCase")]
 struct UpdateBehavior {
     auto_update_enabled: bool,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct AudioAppRoute {
+    app_id: String,
+    app_name: String,
+    device_id: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -312,6 +321,62 @@ fn set_auto_update_enabled(enabled: bool) -> UpdateBehavior {
     UpdateBehavior {
         auto_update_enabled: enabled,
     }
+}
+
+#[tauri::command]
+fn get_audio_output_devices() -> Result<Vec<AudioOutputDevice>, String> {
+    cobweb_control::audio::list_output_devices().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_default_audio_output_device(device_id: String) -> Result<Vec<AudioOutputDevice>, String> {
+    cobweb_control::audio::set_default_output_device(&device_id).map_err(|error| error.to_string())?;
+    cobweb_control::audio::list_output_devices().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn set_audio_output_device_volume(
+    device_id: String,
+    level: u8,
+) -> Result<Vec<AudioOutputDevice>, String> {
+    cobweb_control::audio::set_output_device_volume(&device_id, level)
+        .map_err(|error| error.to_string())?;
+    cobweb_control::audio::list_output_devices().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn get_audio_app_routes() -> Vec<AudioAppRoute> {
+    let store = store::GLOBAL_STORE.lock().unwrap();
+    let saved = &store.data.audio_app_routes;
+    // 先保存应用到输出设备的偏好，真正让 Windows 按进程分流时复用同一份配置。
+    [
+        ("chrome", "Chrome"),
+        ("msedge", "Microsoft Edge"),
+        ("firefox", "Firefox"),
+        ("spotify", "Spotify"),
+        ("apple_music", "Apple Music"),
+    ]
+    .into_iter()
+    .map(|(app_id, app_name)| AudioAppRoute {
+        app_id: app_id.into(),
+        app_name: app_name.into(),
+        device_id: saved.get(app_id).cloned(),
+    })
+    .collect()
+}
+
+#[tauri::command]
+fn set_audio_app_route(app_id: String, device_id: Option<String>) -> Vec<AudioAppRoute> {
+    let mut store = store::GLOBAL_STORE.lock().unwrap();
+
+    if let Some(device_id) = device_id {
+        store.set_audio_app_route(app_id, device_id);
+    } else {
+        store.remove_audio_app_route(&app_id);
+    }
+
+    drop(store);
+    get_audio_app_routes()
 }
 
 fn emit_app_notice(
@@ -604,6 +669,11 @@ pub fn run() {
             set_launch_on_startup,
             get_update_behavior,
             set_auto_update_enabled,
+            get_audio_output_devices,
+            set_default_audio_output_device,
+            set_audio_output_device_volume,
+            get_audio_app_routes,
+            set_audio_app_route,
             remove_paired_client,
             ping_mobile_device,
             notify_mobile_disconnect

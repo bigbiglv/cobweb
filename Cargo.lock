@@ -538,6 +538,7 @@ name = "cobweb"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "cobweb-control",
  "cobweb-scheduler",
  "cobweb-service",
  "futures-util",
@@ -573,6 +574,7 @@ version = "0.1.0"
 name = "cobweb-control"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "windows 0.58.0",
 ]
 

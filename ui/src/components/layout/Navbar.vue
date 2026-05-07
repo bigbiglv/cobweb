@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { mdiMoonWaningCrescent, mdiWeatherSunny } from '@mdi/js'
-import { Clock3, Download, House, LoaderCircle, Music2, PanelsTopLeft, Settings, Smartphone, Sparkles } from 'lucide-vue-next'
+import { Clock3, Download, Headphones, House, LoaderCircle, Music2, PanelsTopLeft, Settings, Smartphone, Sparkles } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import MorphIcon from '../common/MorphIcon.vue'
@@ -36,6 +36,7 @@ const navigationItems = [
   { path: '/connected-devices', label: '设备', icon: Smartphone },
   { path: '/features', label: '功能', icon: Sparkles },
   { path: '/apple-music', label: '音乐', icon: Music2 },
+  { path: '/audio-routing', label: '音频', icon: Headphones },
 ] as const
 
 const themeIconPaths = [mdiMoonWaningCrescent, mdiWeatherSunny]

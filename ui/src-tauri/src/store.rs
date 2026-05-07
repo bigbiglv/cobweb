@@ -89,6 +89,8 @@ pub struct AppConfig {
     pub close_to_tray_on_close: bool,
     #[serde(default = "default_auto_update_enabled")]
     pub auto_update_enabled: bool,
+    #[serde(default)]
+    pub audio_app_routes: HashMap<String, String>,
 }
 
 impl Default for AppConfig {
@@ -106,6 +108,7 @@ impl Default for AppConfig {
             mdns_enabled: true,
             close_to_tray_on_close: true,
             auto_update_enabled: true,
+            audio_app_routes: HashMap::new(),
         }
     }
 }
@@ -232,6 +235,16 @@ impl Store {
 
     pub fn set_auto_update_enabled(&mut self, enabled: bool) {
         self.data.auto_update_enabled = enabled;
+        self.save();
+    }
+
+    pub fn set_audio_app_route(&mut self, app_id: String, device_id: String) {
+        self.data.audio_app_routes.insert(app_id, device_id);
+        self.save();
+    }
+
+    pub fn remove_audio_app_route(&mut self, app_id: &str) {
+        self.data.audio_app_routes.remove(app_id);
         self.save();
     }
 }

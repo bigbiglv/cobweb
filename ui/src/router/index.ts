@@ -62,6 +62,15 @@ const router = createRouter({
             description: '单独控制 Apple Music 播放、暂停和切歌。',
           },
         },
+        {
+          path: 'audio-routing',
+          name: 'AudioRouting',
+          component: () => import('../views/audio-routing/index.vue'),
+          meta: {
+            title: '音频输出',
+            description: '管理 Windows 默认输出设备、应用输出偏好和各输出设备音量。',
+          },
+        },
       ],
     },
   ],
