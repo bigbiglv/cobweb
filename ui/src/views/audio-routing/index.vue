@@ -33,8 +33,6 @@ const devices = ref<AudioOutputDevice[]>([])
 const appRoutes = ref<AudioAppRoute[]>([])
 
 const defaultDevice = computed(() => devices.value.find((device) => device.isDefault) ?? null)
-const hasMultipleDevices = computed(() => devices.value.length > 1)
-
 const mockDevices: AudioOutputDevice[] = [
   { id: 'speaker', name: '桌面音响', volume: 62, muted: false, isDefault: true },
   { id: 'headset', name: '游戏耳机', volume: 48, muted: false, isDefault: false },
