@@ -1,9 +1,5 @@
 <script setup lang="ts">
 import {
-  ClipboardCopy,
-  Download,
-  FileText,
-  ImageIcon,
   RefreshCw,
   Send,
   Trash2,
@@ -20,7 +16,8 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
-import type { ClipboardSyncMessage, WebConsoleStatus, ClipboardSyncResponse, ClipboardSyncAttachment, ClipboardSyncSource } from './types.ts'
+import type { ClipboardSyncMessage, WebConsoleStatus, ClipboardSyncResponse } from './types.ts'
+import Message from './components/Message.vue'
 
 const messages = ref<ClipboardSyncMessage[]>([])
 const selectedFiles = ref<File[]>([])
@@ -144,19 +141,7 @@ async function clearMessages() {
   }
 }
 
-function fileUrl(message: ClipboardSyncMessage, attachment: ClipboardSyncAttachment) {
-  return `${serverBaseUrl()}/web/api/sync/files/${encodeURIComponent(message.messageId)}/${encodeURIComponent(attachment.attachmentId)}`
-}
 
-function formatTime(timestamp: number) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(timestamp)
-}
 
 function formatFileSize(size: number) {
   if (size < 1024)
@@ -166,18 +151,6 @@ function formatFileSize(size: number) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
-function isImage(attachment: ClipboardSyncAttachment) {
-  return attachment.mimeType?.startsWith('image/') ?? false
-}
-
-function sourceName(source: ClipboardSyncSource) {
-  const device = source.deviceModel || source.deviceName || (source.kind === 'pc' ? 'PC' : 'Web 设备')
-  return [device, source.platform, source.browser, source.ip].filter(Boolean).join(' · ')
-}
-
-function sourceBadge(source: ClipboardSyncSource) {
-  return source.kind === 'pc' ? 'PC' : 'Web'
-}
 
 onMounted(async () => {
   await fetchMessages()
@@ -266,67 +239,14 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="messages.length" class="grid gap-4">
-          <article
+          <Message
             v-for="message in messages"
             :key="message.messageId"
-            class="rounded-[1.75rem] border border-border/70 bg-background/70 p-5"
-          >
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div class="min-w-0 flex-1 space-y-4">
-                <div class="flex flex-wrap items-end gap-2">
-                  <Badge class="rounded-full">{{ sourceBadge(message.source) }}</Badge>
-                  <h3 class="text-base font-semibold tracking-[-0.02em]">
-                    {{ formatTime(message.createdAtMs) }}
-                  </h3>
-                  <span class="text-sm text-muted-foreground">
-                    {{ sourceName(message.source) }}
-                  </span>
-                </div>
-
-                <p v-if="message.text" class="whitespace-pre-wrap break-words rounded-2xl bg-muted/50 p-4 text-sm leading-6">
-                  {{ message.text }}
-                </p>
-
-                <div v-if="message.attachments.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                  <a
-                    v-for="attachment in message.attachments"
-                    :key="attachment.attachmentId"
-                    class="group grid min-w-0 gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 text-foreground no-underline transition hover:border-primary/50"
-                    :href="fileUrl(message, attachment)"
-                    :download="attachment.fileName"
-                  >
-                    <img
-                      v-if="isImage(attachment)"
-                      class="aspect-[1.45] w-full rounded-xl object-cover"
-                      :src="fileUrl(message, attachment)"
-                      :alt="attachment.fileName"
-                    >
-                    <div v-else class="flex aspect-[1.45] w-full items-center justify-center rounded-xl bg-muted/70 text-muted-foreground">
-                      <FileText class="size-8" />
-                    </div>
-                    <div class="flex min-w-0 items-center gap-2">
-                      <ImageIcon v-if="isImage(attachment)" class="size-4 shrink-0 text-primary" />
-                      <FileText v-else class="size-4 shrink-0 text-primary" />
-                      <span class="truncate text-sm font-medium">{{ attachment.fileName }}</span>
-                    </div>
-                    <span class="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Download class="size-3.5" />
-                      {{ formatFileSize(attachment.sizeBytes) }}
-                    </span>
-                  </a>
-                </div>
-              </div>
-
-              <div class="flex shrink-0 items-center gap-2">
-                <Button variant="outline" class="rounded-full" size="sm" @click="copyMessage(message)">
-                  <ClipboardCopy class="size-4" />
-                </Button>
-                <Button variant="outline" class="rounded-full" size="sm" @click="deleteMessage(message)">
-                  <Trash2 class="size-4" />
-                </Button>
-              </div>
-            </div>
-          </article>
+            :message="message"
+            :server-url="serverBaseUrl()"
+            @copy="copyMessage"
+            @delete="deleteMessage"
+          />
         </div>
 
         <div
