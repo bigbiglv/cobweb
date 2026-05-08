@@ -20,45 +20,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
-
-interface ClipboardSyncSource {
-  kind: 'pc' | 'web'
-  clientId?: string | null
-  deviceName?: string | null
-  deviceModel?: string | null
-  platform?: string | null
-  browser?: string | null
-  ip?: string | null
-}
-
-interface ClipboardSyncAttachment {
-  attachmentId: string
-  fileName: string
-  storedName: string
-  mimeType?: string | null
-  sizeBytes: number
-}
-
-interface ClipboardSyncMessage {
-  messageId: string
-  createdAtMs: number
-  source: ClipboardSyncSource
-  text?: string | null
-  attachments: ClipboardSyncAttachment[]
-}
-
-interface WebConsoleStatus {
-  running: boolean
-  port: number | null
-  urls: string[]
-}
-
-interface ClipboardSyncResponse {
-  success: boolean
-  msg: string
-  message?: ClipboardSyncMessage | null
-  messages: ClipboardSyncMessage[]
-}
+import type { ClipboardSyncMessage, WebConsoleStatus, ClipboardSyncResponse, ClipboardSyncAttachment, ClipboardSyncSource } from './types.ts'
 
 const messages = ref<ClipboardSyncMessage[]>([])
 const selectedFiles = ref<File[]>([])
@@ -152,14 +114,14 @@ async function submitMessage() {
 async function copyMessage(message: ClipboardSyncMessage) {
   try {
     await invoke('copy_clipboard_sync_message', { messageId: message.messageId })
-    actionMessage.value = '已复制到 PC 剪切板'
+    actionMessage.value = '已复制到剪切板'
   } catch (error) {
     actionMessage.value = String(error instanceof Error ? error.message : error)
   }
 }
 
 async function deleteMessage(message: ClipboardSyncMessage) {
-  if (!window.confirm('确认删除这条同步记录吗？'))
+  if (!window.confirm('确认删除这条记录吗？'))
     return
 
   try {
@@ -171,7 +133,7 @@ async function deleteMessage(message: ClipboardSyncMessage) {
 }
 
 async function clearMessages() {
-  if (!window.confirm('确认清空全部同步记录吗？附件文件也会一起删除。'))
+  if (!window.confirm('确认清空全部同步记录吗？'))
     return
 
   try {
@@ -311,12 +273,14 @@ onUnmounted(() => {
           >
             <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div class="min-w-0 flex-1 space-y-4">
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-end gap-2">
                   <Badge class="rounded-full">{{ sourceBadge(message.source) }}</Badge>
                   <h3 class="text-base font-semibold tracking-[-0.02em]">
-                    {{ sourceName(message.source) }}
+                    {{ formatTime(message.createdAtMs) }}
                   </h3>
-                  <span class="text-sm text-muted-foreground">{{ formatTime(message.createdAtMs) }}</span>
+                  <span class="text-sm text-muted-foreground">
+                    {{ sourceName(message.source) }}
+                  </span>
                 </div>
 
                 <p v-if="message.text" class="whitespace-pre-wrap break-words rounded-2xl bg-muted/50 p-4 text-sm leading-6">
