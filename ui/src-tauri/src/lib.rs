@@ -1,3 +1,4 @@
+pub mod clipboard_sync;
 mod features;
 #[cfg(target_os = "windows")]
 mod flydigi_battery;
@@ -379,6 +380,36 @@ fn set_audio_app_route(app_id: String, device_id: Option<String>) -> Vec<AudioAp
     get_audio_app_routes()
 }
 
+#[tauri::command]
+fn get_clipboard_sync_messages() -> Result<Vec<clipboard_sync::ClipboardSyncMessage>, String> {
+    clipboard_sync::list_messages()
+}
+
+#[tauri::command]
+fn copy_clipboard_sync_message(message_id: String) -> Result<(), String> {
+    let message = clipboard_sync::list_messages()?
+        .into_iter()
+        .find(|message| message.message_id == message_id)
+        .ok_or_else(|| "消息不存在".to_string())?;
+    clipboard_sync::write_message_to_clipboard(&message)
+}
+
+#[tauri::command]
+fn delete_clipboard_sync_message(app: tauri::AppHandle, message_id: String) -> Result<(), String> {
+    clipboard_sync::delete_message(&message_id)?;
+    network::server::broadcast_clipboard_sync();
+    let _ = app.emit("clipboard_sync_changed", serde_json::json!({}));
+    Ok(())
+}
+
+#[tauri::command]
+fn clear_clipboard_sync_messages(app: tauri::AppHandle) -> Result<(), String> {
+    clipboard_sync::clear_messages()?;
+    network::server::broadcast_clipboard_sync();
+    let _ = app.emit("clipboard_sync_changed", serde_json::json!({}));
+    Ok(())
+}
+
 fn emit_app_notice(
     app: &AppHandle,
     title: impl Into<String>,
@@ -674,6 +705,10 @@ pub fn run() {
             set_audio_output_device_volume,
             get_audio_app_routes,
             set_audio_app_route,
+            get_clipboard_sync_messages,
+            copy_clipboard_sync_message,
+            delete_clipboard_sync_message,
+            clear_clipboard_sync_messages,
             remove_paired_client,
             ping_mobile_device,
             notify_mobile_disconnect
@@ -688,7 +723,8 @@ pub fn run() {
             }
 
             if let Ok(app_dir) = app.path().app_data_dir() {
-                store::init_store(app_dir);
+                store::init_store(app_dir.clone());
+                clipboard_sync::init(app_dir);
             }
 
             setup_system_tray(app)?;

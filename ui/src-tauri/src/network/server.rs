@@ -1,7 +1,7 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        ConnectInfo, Query, State,
+        ConnectInfo, DefaultBodyLimit, Multipart, Path, Query, State,
     },
     http::{header, HeaderMap, StatusCode},
     response::{Html, IntoResponse},
@@ -25,6 +25,9 @@ use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
 use crate::{
+    clipboard_sync::{
+        self, ClipboardSyncMessage, ClipboardSyncSource, ClipboardSyncSourceKind, IncomingAttachment,
+    },
     features::execute_feature_command_with_origin,
     scheduler,
     store::{PairedClient, TaskHistoryEntry, GLOBAL_STORE},
@@ -156,6 +159,11 @@ enum WebServerEvent {
         snapshot: Option<FeatureSnapshot>,
         tasks: Vec<ScheduledTask>,
         history: Vec<TaskHistoryEntry>,
+        #[serde(rename = "syncMessages")]
+        sync_messages: Vec<ClipboardSyncMessage>,
+    },
+    ClipboardSync {
+        messages: Vec<ClipboardSyncMessage>,
     },
     FeatureResult {
         request_id: String,
@@ -286,6 +294,16 @@ pub struct WebStateResponse {
     pub snapshot: Option<FeatureSnapshot>,
     pub tasks: Vec<ScheduledTask>,
     pub history: Vec<TaskHistoryEntry>,
+    pub sync_messages: Vec<ClipboardSyncMessage>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClipboardSyncResponse {
+    pub success: bool,
+    pub msg: String,
+    pub message: Option<ClipboardSyncMessage>,
+    pub messages: Vec<ClipboardSyncMessage>,
 }
 
 #[derive(Serialize, Clone)]
@@ -322,7 +340,7 @@ pub async fn start_server(port: u16, tauri_app: AppHandle) -> Result<u16, String
         .route("/tasks/list", post(tasks_list))
         .route("/tasks/create", post(tasks_create))
         .route("/tasks/cancel", post(tasks_cancel))
-        .layer(cors);
+        .layer(cors.clone());
 
     let web_routes = Router::new()
         .route("/web", get(web_index))
@@ -333,7 +351,15 @@ pub async fn start_server(port: u16, tauri_app: AppHandle) -> Result<u16, String
         .route("/web/api/state", get(web_state))
         .route("/web/api/features/execute", post(web_features_execute))
         .route("/web/api/tasks/create", post(web_tasks_create))
-        .route("/web/api/tasks/cancel", post(web_tasks_cancel));
+        .route("/web/api/tasks/cancel", post(web_tasks_cancel))
+        .route("/web/api/sync/history", get(web_clipboard_sync_history))
+        .route("/web/api/sync/messages", post(web_clipboard_sync_create))
+        .route(
+            "/web/api/sync/files/:message_id/:attachment_id",
+            get(web_clipboard_sync_file),
+        )
+        .layer(DefaultBodyLimit::max(200 * 1024 * 1024))
+        .layer(cors);
 
     let app = Router::new()
         .merge(mobile_routes)
@@ -417,6 +443,7 @@ fn web_state_payload() -> WebStateResponse {
         snapshot: get_feature_snapshot().ok(),
         tasks: scheduler::list_tasks(),
         history: scheduler::list_task_history(),
+        sync_messages: clipboard_sync::list_messages().unwrap_or_default(),
     }
 }
 
@@ -427,6 +454,7 @@ fn web_state_event() -> WebServerEvent {
         snapshot: state.snapshot,
         tasks: state.tasks,
         history: state.history,
+        sync_messages: state.sync_messages,
     }
 }
 
@@ -543,6 +571,63 @@ fn emit_web_notice(app: &AppHandle, origin: &TaskOrigin, message: String) {
             "tone": "warning",
         }),
     );
+}
+
+fn emit_clipboard_sync_changed(app: &AppHandle) {
+    let _ = app.emit("clipboard_sync_changed", serde_json::json!({}));
+}
+
+fn clipboard_source(
+    addr: &SocketAddr,
+    source_kind: ClipboardSyncSourceKind,
+    client_info: Option<&WebClientInfo>,
+) -> ClipboardSyncSource {
+    match source_kind {
+        ClipboardSyncSourceKind::Pc => {
+            let store = GLOBAL_STORE.lock().unwrap();
+            ClipboardSyncSource {
+                kind: ClipboardSyncSourceKind::Pc,
+                client_id: Some(store.data.device_id.clone()),
+                device_name: Some(store.data.device_name.clone()),
+                device_model: None,
+                platform: Some(std::env::consts::OS.to_string()),
+                browser: None,
+                ip: Some(addr.ip().to_string()),
+            }
+        }
+        ClipboardSyncSourceKind::Web => {
+            let user_agent = client_info.and_then(|info| info.user_agent.as_deref());
+            ClipboardSyncSource {
+                kind: ClipboardSyncSourceKind::Web,
+                client_id: client_info
+                    .and_then(|info| clean_web_client_part(info.client_id.as_deref())),
+                device_name: client_info
+                    .and_then(|info| clean_web_client_part(info.device_name.as_deref())),
+                device_model: client_info
+                    .and_then(|info| clean_web_client_part(info.device_model.as_deref())),
+                platform: client_info
+                    .and_then(|info| clean_web_client_part(info.platform.as_deref()))
+                    .or_else(|| fallback_platform_name(user_agent)),
+                browser: client_info
+                    .and_then(|info| clean_web_client_part(info.browser.as_deref()))
+                    .or_else(|| fallback_browser_name(user_agent)),
+                ip: Some(addr.ip().to_string()),
+            }
+        }
+    }
+}
+
+fn sync_error_response(status: StatusCode, msg: impl Into<String>) -> axum::response::Response {
+    (
+        status,
+        Json(ClipboardSyncResponse {
+            success: false,
+            msg: msg.into(),
+            message: None,
+            messages: vec![],
+        }),
+    )
+        .into_response()
 }
 
 fn sync_client_state(
@@ -1045,6 +1130,20 @@ pub fn broadcast_web_state_sync() {
     }
 }
 
+pub fn broadcast_clipboard_sync() {
+    let event = WebServerEvent::ClipboardSync {
+        messages: clipboard_sync::list_messages().unwrap_or_default(),
+    };
+    let senders = {
+        let connections = WEB_CONNECTIONS.lock().unwrap();
+        connections.values().cloned().collect::<Vec<_>>()
+    };
+
+    for sender in senders {
+        let _ = sender.send(event.clone());
+    }
+}
+
 pub fn broadcast_tasks_sync() {
     let tasks = scheduler::list_tasks();
     let senders = {
@@ -1323,6 +1422,166 @@ async fn web_main_js(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> impl IntoRes
     web_js_response(&addr, web_console::MAIN_JS)
 }
 
+async fn read_multipart_sync_message(
+    mut multipart: Multipart,
+) -> Result<(Option<String>, Vec<IncomingAttachment>, ClipboardSyncSourceKind, Option<WebClientInfo>), String> {
+    let mut text = None;
+    let mut attachments = Vec::new();
+    let mut source_kind = ClipboardSyncSourceKind::Web;
+    let mut client_info = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|error| format!("读取上传内容失败: {error}"))?
+    {
+        let name = field.name().unwrap_or_default().to_string();
+        match name.as_str() {
+            "text" => {
+                text = Some(
+                    field
+                        .text()
+                        .await
+                        .map_err(|error| format!("读取文本失败: {error}"))?,
+                );
+            }
+            "source_kind" => {
+                let value = field
+                    .text()
+                    .await
+                    .map_err(|error| format!("读取来源失败: {error}"))?;
+                if value.trim().eq_ignore_ascii_case("pc") {
+                    source_kind = ClipboardSyncSourceKind::Pc;
+                }
+            }
+            "client_info" => {
+                let value = field
+                    .text()
+                    .await
+                    .map_err(|error| format!("读取设备信息失败: {error}"))?;
+                client_info = serde_json::from_str::<WebClientInfo>(&value).ok();
+            }
+            "files" | "files[]" => {
+                let Some(file_name) = field.file_name().map(ToString::to_string) else {
+                    continue;
+                };
+                let mime_type = field.content_type().map(ToString::to_string);
+                let bytes = field
+                    .bytes()
+                    .await
+                    .map_err(|error| format!("读取文件失败: {error}"))?;
+                attachments.push(IncomingAttachment {
+                    file_name,
+                    mime_type,
+                    bytes: bytes.to_vec(),
+                });
+            }
+            _ => {}
+        }
+    }
+
+    Ok((text, attachments, source_kind, client_info))
+}
+
+async fn web_clipboard_sync_history(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+) -> impl IntoResponse {
+    if !is_lan_or_loopback(&addr) {
+        return sync_error_response(
+            StatusCode::FORBIDDEN,
+            "Web console is only available on the local network",
+        );
+    }
+
+    match clipboard_sync::list_messages() {
+        Ok(messages) => Json(ClipboardSyncResponse {
+            success: true,
+            msg: "OK".into(),
+            message: None,
+            messages,
+        })
+        .into_response(),
+        Err(error) => sync_error_response(StatusCode::INTERNAL_SERVER_ERROR, error),
+    }
+}
+
+async fn web_clipboard_sync_create(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    multipart: Multipart,
+) -> impl IntoResponse {
+    if !is_lan_or_loopback(&addr) {
+        return sync_error_response(
+            StatusCode::FORBIDDEN,
+            "Web console is only available on the local network",
+        );
+    }
+
+    let (text, attachments, source_kind, client_info) = match read_multipart_sync_message(multipart).await {
+        Ok(value) => value,
+        Err(error) => return sync_error_response(StatusCode::BAD_REQUEST, error),
+    };
+    let write_clipboard = matches!(source_kind, ClipboardSyncSourceKind::Web);
+    let source = clipboard_source(&addr, source_kind, client_info.as_ref());
+
+    match clipboard_sync::create_message(text, attachments, source, write_clipboard).await {
+        Ok(message) => {
+            emit_clipboard_sync_changed(&state.tauri_app);
+            broadcast_clipboard_sync();
+            Json(ClipboardSyncResponse {
+                success: true,
+                msg: "已同步".into(),
+                message: Some(message),
+                messages: clipboard_sync::list_messages().unwrap_or_default(),
+            })
+            .into_response()
+        }
+        Err(error) => sync_error_response(StatusCode::BAD_REQUEST, error),
+    }
+}
+
+async fn web_clipboard_sync_file(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Path((message_id, attachment_id)): Path<(String, String)>,
+) -> impl IntoResponse {
+    if let Some(response) = reject_non_lan(&addr) {
+        return response.into_response();
+    }
+
+    let (path, attachment) = match clipboard_sync::attachment_path(&message_id, &attachment_id) {
+        Ok(value) => value,
+        Err(error) => return (StatusCode::NOT_FOUND, error).into_response(),
+    };
+
+    let bytes = match tokio::fs::read(path).await {
+        Ok(bytes) => bytes,
+        Err(error) => return (StatusCode::NOT_FOUND, error.to_string()).into_response(),
+    };
+
+    let mut headers = HeaderMap::new();
+    if let Some(mime_type) = attachment.mime_type.as_deref() {
+        if let Ok(value) = mime_type.parse() {
+            headers.insert(header::CONTENT_TYPE, value);
+        }
+    }
+    headers.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
+    let ascii_file_name = attachment
+        .file_name
+        .chars()
+        .filter(|ch| ch.is_ascii() && !matches!(ch, '"' | '\\' | '\r' | '\n'))
+        .collect::<String>();
+    let disposition = if ascii_file_name.is_empty() {
+        "attachment".to_string()
+    } else {
+        format!("attachment; filename=\"{}\"", ascii_file_name)
+    };
+    if let Ok(value) = disposition.parse() {
+        headers.insert(header::CONTENT_DISPOSITION, value);
+    }
+
+    (headers, bytes).into_response()
+}
+
 async fn web_state(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> Json<WebStateResponse> {
     if !is_lan_or_loopback(&addr) {
         return Json(WebStateResponse {
@@ -1332,6 +1591,7 @@ async fn web_state(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> Json<WebStateR
             snapshot: None,
             tasks: vec![],
             history: vec![],
+            sync_messages: vec![],
         });
     }
 

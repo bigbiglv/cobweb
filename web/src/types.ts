@@ -96,6 +96,34 @@ export interface TaskHistoryEntry {
   origin?: TaskOrigin;
 }
 
+export type ClipboardSyncSourceKind = "pc" | "web";
+
+export interface ClipboardSyncSource {
+  kind: ClipboardSyncSourceKind;
+  clientId?: string | null;
+  deviceName?: string | null;
+  deviceModel?: string | null;
+  platform?: string | null;
+  browser?: string | null;
+  ip?: string | null;
+}
+
+export interface ClipboardSyncAttachment {
+  attachmentId: string;
+  fileName: string;
+  storedName: string;
+  mimeType?: string | null;
+  sizeBytes: number;
+}
+
+export interface ClipboardSyncMessage {
+  messageId: string;
+  createdAtMs: number;
+  source: ClipboardSyncSource;
+  text?: string | null;
+  attachments: ClipboardSyncAttachment[];
+}
+
 export interface WebStateResponse {
   success: boolean;
   msg: string;
@@ -103,6 +131,7 @@ export interface WebStateResponse {
   snapshot: FeatureSnapshot | null;
   tasks: ScheduledTask[];
   history: TaskHistoryEntry[];
+  syncMessages: ClipboardSyncMessage[];
 }
 
 export interface FeatureExecuteResponse {
@@ -122,4 +151,11 @@ export interface TaskCreateResponse {
   success: boolean;
   msg: string;
   task?: ScheduledTask | null;
+}
+
+export interface ClipboardSyncResponse {
+  success: boolean;
+  msg: string;
+  message?: ClipboardSyncMessage | null;
+  messages: ClipboardSyncMessage[];
 }

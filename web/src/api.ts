@@ -1,4 +1,5 @@
 import type {
+  ClipboardSyncResponse,
   FeatureCommand,
   FeatureExecuteResponse,
   TaskCreateResponse,
@@ -148,4 +149,33 @@ export async function cancelScheduledTask(taskId: string) {
     method: "POST",
     body: JSON.stringify({ client_info: await getWebClientInfo(), task_id: taskId }),
   });
+}
+
+export async function sendClipboardSyncMessage(text: string, files: File[]) {
+  const form = new FormData();
+  form.set("source_kind", "web");
+  form.set("client_info", JSON.stringify(await getWebClientInfo()));
+  if (text.trim()) {
+    form.set("text", text);
+  }
+  files.forEach((file) => {
+    form.append("files", file, file.name);
+  });
+
+  const response = await fetch("/web/api/sync/messages", {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) {
+    throw new Error(`发送失败：${response.status}`);
+  }
+  const payload = await response.json() as ClipboardSyncResponse;
+  if (!payload.success) {
+    throw new Error(payload.msg || "发送失败");
+  }
+  return payload;
+}
+
+export function clipboardSyncFileUrl(messageId: string, attachmentId: string) {
+  return `/web/api/sync/files/${encodeURIComponent(messageId)}/${encodeURIComponent(attachmentId)}`;
 }

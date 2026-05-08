@@ -449,3 +449,187 @@ Web 前端当前策略是：
 3. 执行功能时，如果 WebSocket 已连接，发送 `execute_feature`。
 4. 如果 WebSocket 不可用，降级调用 `POST /web/api/features/execute`。
 5. 创建和取消定时任务始终走 HTTP API。
+
+## 资源同步接口
+
+本节记录 PC 和 Web 设备之间同步文本、图片和任意文件的接口。资源同步历史由 PC 维护，不依赖浏览器 `localStorage`。
+
+### 存储策略
+
+每次发送算一条消息。文本、单个文件、一组文件、文本加文件都保存为同一条消息。PC 端以单条消息为单位落盘：
+
+```text
+{app_data_dir}/clipboard-sync/messages/{createdAtMs}-{messageId}/
+  message.json
+  {attachmentId}_{fileName}
+```
+
+`message.json` 保存消息元信息，附件文件保存在同一目录。PC 管理页支持按单条消息删除，也支持清空全部同步记录。当前最多保留 500 条，超过后会清理最旧消息。
+
+### WebSocket 同步事件
+
+资源同步历史变化后，服务端会向 `/web/ws` 连接推送：
+
+```json
+{
+  "type": "clipboard_sync",
+  "messages": [
+    {
+      "messageId": "1778031600000-5b9b94a0-7b0b-4b55-bec2-e6e68f70f7e8",
+      "createdAtMs": 1778031600000,
+      "source": {
+        "kind": "web",
+        "clientId": "browser-client-id",
+        "deviceName": "iPhone",
+        "deviceModel": "iPhone",
+        "platform": "iOS",
+        "browser": "Safari",
+        "ip": "192.168.1.10"
+      },
+      "text": "hello",
+      "attachments": []
+    }
+  ]
+}
+```
+
+`state_sync` 事件和 `GET /web/api/state` 响应中也会包含 `syncMessages` 字段，结构同上。
+
+### 获取同步历史
+
+```text
+GET /web/api/sync/history
+```
+
+成功响应：
+
+```json
+{
+  "success": true,
+  "msg": "OK",
+  "message": null,
+  "messages": []
+}
+```
+
+### 创建同步消息
+
+```text
+POST /web/api/sync/messages
+Content-Type: multipart/form-data
+```
+
+表单字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `source_kind` | `web` / `pc` | 否 | 来源类型，默认 `web`。Web 来源会同步写入 PC 剪切板。 |
+| `client_info` | JSON string | 否 | Web 设备信息，用于记录设备名、机型、平台、浏览器和 IP。 |
+| `text` | string | 否 | 要同步的文本。 |
+| `files` / `files[]` | file | 否 | 附件，可多选，支持任意文件。 |
+
+`text` 和 `files` 至少需要提供一个。
+
+浏览器示例：
+
+```js
+const form = new FormData();
+form.set("source_kind", "web");
+form.set("client_info", JSON.stringify({
+  clientId: "browser-client-id",
+  deviceName: "iPhone",
+  deviceModel: "iPhone",
+  platform: "iOS",
+  browser: "Safari",
+}));
+form.set("text", "hello");
+files.forEach((file) => form.append("files", file, file.name));
+
+await fetch("/web/api/sync/messages", {
+  method: "POST",
+  body: form,
+});
+```
+
+成功响应：
+
+```json
+{
+  "success": true,
+  "msg": "已同步",
+  "message": {
+    "messageId": "1778031600000-5b9b94a0-7b0b-4b55-bec2-e6e68f70f7e8",
+    "createdAtMs": 1778031600000,
+    "source": {
+      "kind": "web",
+      "clientId": "browser-client-id",
+      "deviceName": "iPhone",
+      "deviceModel": "iPhone",
+      "platform": "iOS",
+      "browser": "Safari",
+      "ip": "192.168.1.10"
+    },
+    "text": "hello",
+    "attachments": [
+      {
+        "attachmentId": "8fd6a6d0-9f10-4a42-8ffc-111111111111",
+        "fileName": "photo.png",
+        "storedName": "8fd6a6d0-9f10-4a42-8ffc-111111111111_photo.png",
+        "mimeType": "image/png",
+        "sizeBytes": 102400
+      }
+    ]
+  },
+  "messages": []
+}
+```
+
+Web 来源的剪切板规则：
+
+- 只有文本：写入 PC 文本剪切板。
+- 有附件：附件保存到 PC 磁盘，并把保存后的文件路径列表写入 PC 文件剪切板，支持多图和任意文件。
+- 文本加附件：文本保存到历史，附件写入文件剪切板。
+
+PC 来源不会再次写入 PC 剪切板，只创建历史并广播给 Web。
+
+### 下载同步附件
+
+```text
+GET /web/api/sync/files/:message_id/:attachment_id
+```
+
+返回附件二进制内容。响应会尽量带上原始 `Content-Type`，并使用 `Content-Disposition: attachment` 便于浏览器保存。
+
+### 字段说明
+
+#### ClipboardSyncMessage
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `messageId` | string | 消息 ID，也是 PC 磁盘消息目录名的一部分 |
+| `createdAtMs` | number | 创建时间，Unix 毫秒时间戳 |
+| `source` | object | 来源信息 |
+| `text` | string 或 null | 同步文本 |
+| `attachments` | array | 附件列表 |
+
+#### ClipboardSyncSource
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `kind` | `pc` / `web` | 来源类型 |
+| `clientId` | string 或 null | 客户端 ID |
+| `deviceName` | string 或 null | 设备名 |
+| `deviceModel` | string 或 null | 设备机型，浏览器可提供时记录 |
+| `platform` | string 或 null | 操作系统或平台 |
+| `browser` | string 或 null | 浏览器名称 |
+| `ip` | string 或 null | 请求来源 IP |
+
+#### ClipboardSyncAttachment
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `attachmentId` | string | 附件 ID |
+| `fileName` | string | 原始文件名，经过安全清理 |
+| `storedName` | string | PC 磁盘中的保存文件名 |
+| `mimeType` | string 或 null | 上传时的 MIME 类型 |
+| `sizeBytes` | number | 文件大小 |

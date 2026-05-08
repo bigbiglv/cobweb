@@ -32,14 +32,19 @@ const {
   selectedFeatureKey,
   selectedFeatureNeedsVolume,
   statusLabels,
+  submitSyncMessage,
   submitTask,
+  syncFileUrl,
+  syncSending,
   taskDelayMinutes,
   taskDelaySeconds,
   tasks,
   taskVolume,
   toast,
   visibleHistory,
+  visibleSyncMessages,
   snapshot,
+  copySyncText,
 } = useWebConsole({
   confirmAction: (feature) => confirm({
     title: `确认${feature.title}`,
@@ -53,12 +58,15 @@ const {
 
 const mediaRefreshState = ref<"idle" | "running" | "done">("idle");
 const volumeRefreshState = ref<"idle" | "running" | "done">("idle");
+const syncText = ref("");
+const syncFiles = ref<File[]>([]);
 let mediaRefreshDoneTimer = 0;
 let volumeRefreshDoneTimer = 0;
 
 const navItems = [
   { key: "actions", label: "操作", icon: "zap" },
   { key: "schedules", label: "定时", icon: "clock" },
+  { key: "sync", label: "同步", icon: "upload" },
   { key: "history", label: "历史", icon: "history" },
 ] as const;
 
@@ -115,6 +123,45 @@ function runMediaAction(feature: FeatureDefinition, action: MediaPlayerAction) {
 
 function sourceName(name: string | null | undefined) {
   return name || "未知来源";
+}
+
+function handleSyncFiles(event: Event) {
+  const input = event.target as HTMLInputElement;
+  syncFiles.value = Array.from(input.files ?? []);
+}
+
+async function submitSync() {
+  const sent = await submitSyncMessage(syncText.value, syncFiles.value);
+  if (!sent) return;
+  syncText.value = "";
+  syncFiles.value = [];
+  const input = document.querySelector<HTMLInputElement>("#sync-file-input");
+  if (input) input.value = "";
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isImage(mimeType: string | null | undefined) {
+  return mimeType?.startsWith("image/") ?? false;
+}
+
+function syncSourceName(message: {
+  source?: {
+    kind?: string;
+    deviceName?: string | null;
+    deviceModel?: string | null;
+    platform?: string | null;
+    browser?: string | null;
+    ip?: string | null;
+  };
+}) {
+  const source = message.source;
+  const device = source?.deviceModel || source?.deviceName || (source?.kind === "pc" ? "PC" : "Web 设备");
+  return [device, source?.platform, source?.browser, source?.ip].filter(Boolean).join(" · ");
 }
 </script>
 
@@ -244,6 +291,63 @@ function sourceName(name: string | null | undefined) {
           </article>
         </div>
         <div v-else class="empty-state">暂无任务</div>
+      </section>
+
+      <section v-show="activeTab === 'sync'" class="page">
+        <form class="composer-panel sync-composer" @submit.prevent="submitSync">
+          <label class="sync-text-field">
+            <span>文本</span>
+            <textarea v-model="syncText" rows="3" placeholder="输入要发送到 PC 的文本" />
+          </label>
+
+          <label>
+            <span>文件</span>
+            <input id="sync-file-input" type="file" multiple @change="handleSyncFiles">
+          </label>
+
+          <button class="primary-button confirm-button" type="submit" :disabled="syncSending">
+            {{ syncSending ? "发送中" : "发送" }}
+          </button>
+        </form>
+
+        <div v-if="syncFiles.length" class="sync-selected-files">
+          <span v-for="file in syncFiles" :key="`${file.name}-${file.size}`">
+            {{ file.name }} · {{ formatFileSize(file.size) }}
+          </span>
+        </div>
+
+        <div v-if="visibleSyncMessages.length" class="list-stack sync-list">
+          <article v-for="message in visibleSyncMessages" :key="message.messageId" class="list-row sync-message">
+            <div class="list-row-main">
+              <div class="list-row-title">{{ syncSourceName(message) }}</div>
+              <div class="list-row-meta">{{ formatDate(message.createdAtMs) }}</div>
+              <p v-if="message.text" class="sync-message-text">{{ message.text }}</p>
+              <div v-if="message.attachments.length" class="sync-attachments">
+                <a
+                  v-for="attachment in message.attachments"
+                  :key="attachment.attachmentId"
+                  class="sync-attachment"
+                  :href="syncFileUrl(message.messageId, attachment.attachmentId)"
+                  :download="attachment.fileName"
+                >
+                  <img
+                    v-if="isImage(attachment.mimeType)"
+                    :src="syncFileUrl(message.messageId, attachment.attachmentId)"
+                    :alt="attachment.fileName"
+                  >
+                  <span>{{ attachment.fileName }}</span>
+                  <small>{{ formatFileSize(attachment.sizeBytes) }}</small>
+                </a>
+              </div>
+            </div>
+            <div class="list-row-actions">
+              <button v-if="message.text" class="secondary-button" type="button" @click="copySyncText(message.text)">
+                复制
+              </button>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state">暂无同步记录</div>
       </section>
 
       <section v-show="activeTab === 'history'" class="page">

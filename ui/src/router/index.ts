@@ -36,6 +36,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'clipboard-sync',
+          name: 'ClipboardSync',
+          component: () => import('../views/clipboard-sync/index.vue'),
+          meta: {
+            title: '资源同步',
+            description: '在 PC 和 Web 设备之间同步文本、图片和文件，并维护本地历史记录。',
+          },
+        },
+        {
           path: 'connected-devices',
           name: 'ConnectedDevices',
           component: () => import('../views/connected-devices/index.vue'),

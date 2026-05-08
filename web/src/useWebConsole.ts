@@ -1,6 +1,15 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { cancelScheduledTask, createScheduledTask, executeCommand, fetchState, getWebClientInfo } from "./api";
+import {
+  cancelScheduledTask,
+  clipboardSyncFileUrl,
+  createScheduledTask,
+  executeCommand,
+  fetchState,
+  getWebClientInfo,
+  sendClipboardSyncMessage,
+} from "./api";
 import type {
+  ClipboardSyncMessage,
   ConnectionStatus,
   FeatureCommand,
   FeatureDefinition,
@@ -54,7 +63,8 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
   const snapshot = ref<FeatureSnapshot | null>(null);
   const tasks = ref<ScheduledTask[]>([]);
   const history = ref<TaskHistoryEntry[]>([]);
-  const activeTab = ref<"actions" | "schedules" | "history">("actions");
+  const syncMessages = ref<ClipboardSyncMessage[]>([]);
+  const activeTab = ref<"actions" | "schedules" | "sync" | "history">("actions");
   const activeFeatureKey = ref("");
   const completedFeatureKey = ref("");
   const selectedFeatureKey = ref("");
@@ -62,6 +72,7 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
   const taskDelayMinutes = ref(5);
   const taskDelaySeconds = ref(0);
   const toast = ref("");
+  const syncSending = ref(false);
   const connectionStatus = ref<ConnectionStatus>("connecting");
   const connectionDetail = ref("等待同步");
   const now = ref(Date.now());
@@ -89,12 +100,14 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
   });
   const selectedFeatureNeedsVolume = computed(() => selectedFeature.value?.control.type === "range");
   const visibleHistory = computed(() => history.value.slice(0, 80));
+  const visibleSyncMessages = computed(() => syncMessages.value.slice(0, 120));
 
   function applyState(payload: WebStateResponse) {
     groups.value = payload.groups ?? [];
     snapshot.value = payload.snapshot ?? null;
     tasks.value = payload.tasks ?? [];
     history.value = payload.history ?? [];
+    syncMessages.value = payload.syncMessages ?? [];
 
     if (!selectedFeatureKey.value || !schedulableFeatures.value.some((feature) => feature.featureKey === selectedFeatureKey.value)) {
       selectedFeatureKey.value = schedulableFeatures.value[0]?.featureKey ?? "";
@@ -245,6 +258,36 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
     }
   }
 
+  async function submitSyncMessage(text: string, files: File[]) {
+    if (!text.trim() && files.length === 0) {
+      showToast("请输入文本或选择文件");
+      return false;
+    }
+
+    try {
+      syncSending.value = true;
+      const payload = await sendClipboardSyncMessage(text, files);
+      syncMessages.value = payload.messages ?? syncMessages.value;
+      showToast("已发送到 PC");
+      return true;
+    } catch (error) {
+      showToast(String(error instanceof Error ? error.message : error));
+      return false;
+    } finally {
+      syncSending.value = false;
+    }
+  }
+
+  async function copySyncText(text: string | null | undefined) {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("已复制文本");
+    } catch {
+      showToast("复制失败，请手动选择文本");
+    }
+  }
+
   function connectWebSocket() {
     window.clearTimeout(reconnectTimer);
     window.clearInterval(heartbeatTimer);
@@ -269,6 +312,9 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
       const payload = JSON.parse(event.data);
       if (payload.type === "state_sync") {
         applyState(payload as WebStateResponse);
+      }
+      if (payload.type === "clipboard_sync") {
+        syncMessages.value = payload.messages ?? [];
       }
       if (payload.type === "feature_result") {
         const pending = pendingCommands.get(payload.request_id);
@@ -356,6 +402,7 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
     connectionDetail,
     connectionStatus,
     countdownText,
+    copySyncText,
     formatDate,
     groups,
     mediaPlayerFeatures,
@@ -369,12 +416,17 @@ export function useWebConsole(options: WebConsoleOptions = {}) {
     showToast,
     snapshot,
     statusLabels,
+    submitSyncMessage,
     submitTask,
+    syncSending,
+    syncFileUrl: clipboardSyncFileUrl,
+    syncMessages,
     taskDelayMinutes,
     taskDelaySeconds,
     tasks,
     taskVolume,
     toast,
     visibleHistory,
+    visibleSyncMessages,
   };
 }
