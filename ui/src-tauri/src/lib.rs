@@ -147,11 +147,11 @@ fn web_console_status_value() -> WebConsoleStatus {
         .map(|port| {
             let mut addresses = network::mdns::local_lan_ip_addresses()
                 .into_iter()
-                .map(|ip| format!("{}:{}/web", ip, port))
+                .map(|ip| format!("http://{}:{}/web", ip, port))
                 .collect::<Vec<_>>();
 
             if addresses.is_empty() {
-                addresses.push(format!("127.0.0.1:{}/web", port));
+                addresses.push(format!("http://127.0.0.1:{}/web", port));
             }
 
             addresses

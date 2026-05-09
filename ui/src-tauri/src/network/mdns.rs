@@ -4,6 +4,13 @@ use mdns_sd::{ServiceDaemon, ServiceInfo};
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 
+#[derive(Clone)]
+struct LanAddress {
+    ip: Ipv4Addr,
+    broadcast: Ipv4Addr,
+    score: i32,
+}
+
 fn sanitize_host_label(value: &str) -> String {
     let mut label = value
         .chars()
@@ -29,26 +36,105 @@ fn broadcast_from_ip_and_netmask(ip: Ipv4Addr, netmask: Ipv4Addr) -> Ipv4Addr {
     Ipv4Addr::from(ip | !netmask)
 }
 
-fn collect_network_profile() -> Result<(Vec<IpAddr>, Option<String>), Box<dyn std::error::Error>> {
-    let interfaces = get_if_addrs()?
+fn adapter_score(name: &str, ip: Ipv4Addr) -> i32 {
+    let normalized_name = name.to_ascii_lowercase();
+    let mut score = 0;
+
+    if ip.is_private() {
+        score += 100;
+    }
+
+    // Windows often exposes VPN, VM, WSL and tunnel adapters before the real Wi-Fi adapter.
+    // Ranking keeps the URL shown in the UI on the network a phone can usually reach.
+    if [
+        "wi-fi", "wifi", "wlan", "wireless", "802.11", "无线", "wlan",
+    ]
+    .iter()
+    .any(|keyword| normalized_name.contains(keyword))
+    {
+        score += 60;
+    }
+
+    if ["ethernet", "以太", "realtek", "intel", "killer"]
+        .iter()
+        .any(|keyword| normalized_name.contains(keyword))
+    {
+        score += 50;
+    }
+
+    if [
+        "virtual",
+        "vmware",
+        "virtualbox",
+        "veth",
+        "vethernet",
+        "hyper-v",
+        "wsl",
+        "docker",
+        "loopback",
+        "tunnel",
+        "tun",
+        "tap",
+        "vpn",
+        "tailscale",
+        "zerotier",
+        "clash",
+        "sing",
+        "npcap",
+        "bluetooth",
+        "oray",
+        "hamachi",
+        "wireguard",
+    ]
+    .iter()
+    .any(|keyword| normalized_name.contains(keyword))
+    {
+        score -= 100;
+    }
+
+    score
+}
+
+fn collect_lan_addresses() -> Result<Vec<LanAddress>, Box<dyn std::error::Error>> {
+    let mut addresses = get_if_addrs()?
         .into_iter()
         .filter_map(|interface| match interface.addr {
-            IfAddr::V4(ipv4) if !ipv4.ip.is_loopback() && !ipv4.ip.is_link_local() => Some((
-                IpAddr::V4(ipv4.ip),
-                broadcast_from_ip_and_netmask(ipv4.ip, ipv4.netmask),
-            )),
+            IfAddr::V4(ipv4) if !ipv4.ip.is_loopback() && !ipv4.ip.is_link_local() => {
+                Some(LanAddress {
+                    ip: ipv4.ip,
+                    broadcast: broadcast_from_ip_and_netmask(ipv4.ip, ipv4.netmask),
+                    score: adapter_score(&interface.name, ipv4.ip),
+                })
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
 
-    if interfaces.is_empty() {
+    addresses.sort_by(|left, right| {
+        right
+            .score
+            .cmp(&left.score)
+            .then_with(|| left.ip.octets().cmp(&right.ip.octets()))
+    });
+
+    addresses.dedup_by_key(|address| address.ip);
+
+    if addresses.is_empty() {
         return Err("no non-loopback IPv4 address found for mDNS broadcast".into());
     }
 
-    let ip_addresses = interfaces.iter().map(|(ip, _)| *ip).collect::<Vec<_>>();
-    let broadcast_address = interfaces
+    Ok(addresses)
+}
+
+fn collect_network_profile() -> Result<(Vec<IpAddr>, Option<String>), Box<dyn std::error::Error>> {
+    let addresses = collect_lan_addresses()?;
+    let ip_addresses = addresses
+        .iter()
+        .map(|address| IpAddr::V4(address.ip))
+        .collect::<Vec<_>>();
+    let broadcast_address = addresses
         .first()
-        .map(|(_, broadcast)| broadcast.to_string());
+        .map(|address| address.broadcast.to_string());
 
     Ok((ip_addresses, broadcast_address))
 }
