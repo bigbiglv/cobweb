@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from "vue"
 import Button from './Button.vue'
-import DrawIcon from "@/components/animatedIcons/mid/DrawIcon.vue"
-import MorphIcon from "@/components/animatedIcons/mid/MorphIcon.vue"
-import { mdiSync, mdiLoading, mdiCheck } from '@mdi/js'
+import DrawIcon from "@/components/animatedIcons/lucide/DrawIcon.vue"
+import MorphIcon from "@/components/animatedIcons/lucide/MorphIcon.vue"
+import { Check, LoaderCircle, RefreshCw } from 'lucide-vue-next'
 
 interface Props {
   loading: boolean
@@ -11,8 +11,7 @@ interface Props {
 
 const { loading = false } = defineProps<Props>()
 
-const paths = [mdiSync, mdiLoading]
-const checkDrawPath = "M4.91 12.09L9 16.17L19.59 5.59"
+const icons = [RefreshCw, LoaderCircle]
 const activeIndex = ref(loading ? 1 : 0)
 const showSuccess = ref(false)
 let successTimer: number | undefined
@@ -58,13 +57,13 @@ watch(
     <DrawIcon
       v-if="showSuccess"
       class="refresh-icon refresh-icon--success"
-      :duration="1"
-      :draw-path="checkDrawPath"
-      :path="mdiCheck"
+      :duration="0.5"
+      :icon="Check"
+      direction="reverse"
     />
     <MorphIcon
       v-else
-      :paths="paths"
+      :icons="icons"
       :active-index="activeIndex"
       class="refresh-icon"
       :class="{ 'refresh-icon--loading': activeIndex === 1 }"

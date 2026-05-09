@@ -7,21 +7,20 @@ import {
   Globe2,
   Keyboard,
   Mouse,
-  RefreshCw,
   Usb,
 } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { CSSProperties } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { Button } from '../../components/ui/button/index'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
-import { toast } from '../../composables/useToast'
+import { toast } from '@/composables/useToast.ts'
+import { Refresh } from '@/components/ui/button/index'
 import type { PeripheralDevice } from './types'
 
 const devices = ref<PeripheralDevice[]>([])
@@ -303,10 +302,11 @@ onUnmounted(async () => {
                 {{ deviceError }}
               </p>
             </div>
-            <Button variant="outline" class="rounded-full" :disabled="refreshingDevices" @click="refreshDevices">
-              <RefreshCw class="size-4" :class="{ 'animate-spin': refreshingDevices }" />
-              <span>刷新</span>
-            </Button>
+<!--            <Button variant="outline" class="rounded-full" :disabled="refreshingDevices" @click="refreshDevices">-->
+<!--              <RefreshCw class="size-4" :class="{ 'animate-spin': refreshingDevices }" />-->
+<!--              <span>刷新</span>-->
+<!--            </Button>-->
+            <Refresh :loading="refreshingDevices" @click="refreshDevices" />
           </div>
         </CardHeader>
         <CardContent class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
