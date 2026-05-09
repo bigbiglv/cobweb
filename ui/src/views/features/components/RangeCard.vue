@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RefreshCw, Volume2 } from 'lucide-vue-next'
-import { Button } from '../../../components/ui/button/index'
+import { Volume2 } from 'lucide-vue-next'
+import { Button, Refresh } from '../../../components/ui/button/index'
 import type { RangeFeatureDefinition } from '../types'
 
 interface Props {
@@ -50,15 +50,11 @@ const displayValue = computed(() => `${value}${feature.control.unit}`)
       >
 
       <div class="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          class="rounded-full"
+        <Refresh
+          :loading="refreshing"
           :disabled="refreshing || pending"
           @click="emit('refresh')"
-        >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
-        </Button>
+        />
 
         <Button class="rounded-full" :disabled="pending" @click="emit('apply', feature)">
           {{ pending ? '执行中' : feature.control.actionText }}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Power, RefreshCw, RotateCw, TestTube2 } from 'lucide-vue-next'
-import { Button } from '../../../components/ui/button/index'
+import { Power, RotateCw, TestTube2 } from 'lucide-vue-next'
+import { Button, Refresh } from '../../../components/ui/button/index'
 import type { ActionFeatureDefinition } from '../types'
 
 interface Props {
@@ -44,16 +44,12 @@ const buttonVariant = computed(() =>
           </h3>
         </div>
 
-        <Button
+        <Refresh
           v-if="refreshable"
-          variant="outline"
-          size="icon"
-          class="rounded-full"
+          :loading="refreshing"
           :disabled="refreshing || pending"
           @click="emit('refresh', feature)"
-        >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
-        </Button>
+        />
       </div>
 
       <Button

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Music, Pause, Play, RefreshCw, SkipBack, SkipForward } from 'lucide-vue-next'
-import { Button } from '../../../components/ui/button/index'
+import { Music, Pause, Play, SkipBack, SkipForward } from 'lucide-vue-next'
+import { Button, Refresh } from '../../../components/ui/button/index'
 import type { AppleMusicTrackInfo, MediaPlayerAction, MediaPlayerFeatureDefinition } from '../types'
 
 interface Props {
@@ -64,15 +64,11 @@ function progressPercent(track: AppleMusicTrackInfo | null) {
           </div>
         </div>
 
-        <Button
-          variant="outline"
-          size="icon"
-          class="rounded-full"
+        <Refresh
+          :loading="refreshing"
           :disabled="refreshing"
           @click="emit('refresh')"
-        >
-          <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
-        </Button>
+        />
       </div>
 
       <div v-if="track?.positionMs || track?.durationMs" class="grid gap-1">

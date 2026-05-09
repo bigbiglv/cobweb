@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { invoke, isTauri } from '@tauri-apps/api/core'
-import { Check, MonitorSpeaker, RefreshCw, Route, Volume2 } from 'lucide-vue-next'
+import { Check, MonitorSpeaker, Route, Volume2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
-import { Button } from '../../components/ui/button'
+import { Button, Refresh } from '../../components/ui/button'
 import {
   Card,
   CardContent,
@@ -196,15 +196,11 @@ onMounted(() => {
               </CardDescription>
             </div>
 
-            <Button
-              variant="outline"
-              size="icon"
-              class="rounded-full"
+            <Refresh
+              :loading="refreshing"
               :disabled="refreshing"
               @click="loadPageData({ notify: true })"
-            >
-              <RefreshCw class="size-4" :class="{ 'animate-spin': refreshing }" />
-            </Button>
+            />
           </div>
         </CardHeader>
 

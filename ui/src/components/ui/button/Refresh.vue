@@ -1,18 +1,28 @@
 <script setup lang="ts">
+import type { HTMLAttributes } from "vue"
+import type { ButtonVariants } from "./variants"
 import { ref, watch } from "vue"
 import Button from './Button.vue'
 import DrawIcon from "@/components/animatedIcons/lucide/DrawIcon.vue"
 import MorphIcon from "@/components/animatedIcons/lucide/MorphIcon.vue"
+import { cn } from "@/lib/utils.ts"
 import { Check, LoaderCircle, RefreshCw } from 'lucide-vue-next'
 
 interface Props {
-  loading: boolean
+  loading?: boolean
+  variant?: ButtonVariants["variant"]
+  size?: ButtonVariants["size"]
+  class?: HTMLAttributes["class"]
 }
 
-const { loading = false } = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  variant: 'outline',
+  size: 'icon',
+})
 
 const icons = [RefreshCw, LoaderCircle]
-const activeIndex = ref(loading ? 1 : 0)
+const activeIndex = ref(props.loading ? 1 : 0)
 const showSuccess = ref(false)
 let successTimer: number | undefined
 
@@ -24,7 +34,7 @@ function clearSuccessTimer() {
 }
 
 watch(
-  () => loading,
+  () => props.loading,
   (loading, wasLoading) => {
     clearSuccessTimer()
 
@@ -53,7 +63,7 @@ watch(
 </script>
 
 <template>
-  <Button variant="outline">
+  <Button :variant="props.variant" :size="props.size" :class="cn('rounded-full', props.class)">
     <DrawIcon
       v-if="showSuccess"
       class="refresh-icon refresh-icon--success"

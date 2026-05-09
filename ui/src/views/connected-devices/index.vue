@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { RefreshCw, Smartphone, Unplug, WifiOff, Wifi } from 'lucide-vue-next'
+import { Smartphone, Unplug, WifiOff, Wifi } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { Badge } from '../../components/ui/badge/index'
-import { Button } from '../../components/ui/button/index'
+import { Button, Refresh } from '../../components/ui/button/index'
 import { confirmDialog } from '../../composables/useConfirm'
 import { toast } from '../../composables/useToast'
 import {
@@ -190,9 +190,7 @@ onUnmounted(() => {
               <Button variant="outline" class="rounded-full" :disabled="mdnsPending" @click="toggleMdns">
                 <component :is="mdnsEnabled ? Wifi : WifiOff" class="size-4" />
               </Button>
-              <Button variant="outline" class="rounded-full" @click="fetchClients">
-                <RefreshCw class="size-4" />
-              </Button>
+              <Refresh :loading="loading" @click="fetchClients" />
             </div>
           </div>
           <div class="space-y-2">

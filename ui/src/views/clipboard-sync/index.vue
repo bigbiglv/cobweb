@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  RefreshCw,
   Send,
   Trash2,
 } from 'lucide-vue-next'
@@ -9,7 +8,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { Badge } from '../../components/ui/badge/index'
-import { Button } from '../../components/ui/button/index'
+import { Button, Refresh } from '../../components/ui/button/index'
 import { confirmDialog } from '../../composables/useConfirm'
 import { toast } from '../../composables/useToast'
 import {
@@ -223,9 +222,7 @@ onUnmounted(() => {
             <Badge variant="secondary" class="rounded-full">{{ totalFiles }} 个附件</Badge>
           </div>
           <div class="flex items-center gap-2">
-            <Button variant="outline" class="rounded-full" @click="fetchMessages">
-              <RefreshCw class="size-4" />
-            </Button>
+            <Refresh :loading="loading" @click="fetchMessages" />
             <Button variant="outline" class="rounded-full" @click="clearMessages">
               <Trash2 class="size-4" />
               清空
