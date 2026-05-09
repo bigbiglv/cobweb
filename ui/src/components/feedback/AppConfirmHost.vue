@@ -2,8 +2,8 @@
 import { AlertTriangle, HelpCircle, ShieldAlert, X } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { Button } from '../ui/button/index'
-import { useConfirmStore } from '../../composables/useConfirm'
-import type { ConfirmDialogItem, ConfirmTone } from '../../composables/useConfirm'
+import { useConfirmStore } from '@/composables/useConfirm.ts'
+import type { ConfirmDialogItem, ConfirmTone } from '@/composables/useConfirm.ts'
 
 const { state, topConfirmDialog, resolveConfirmDialog } = useConfirmStore()
 
@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
 
 .app-confirm-body h2 {
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-display),serif;
   font-size: 1.25rem;
   font-weight: 700;
   line-height: 1.35;

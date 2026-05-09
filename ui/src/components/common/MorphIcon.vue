@@ -79,7 +79,7 @@ watch(
     xmlns="http://www.w3.org/2000/svg"
     aria-hidden="true"
   >
-    <path ref="morphPath" fill="currentColor" />
+    <path ref="morphPath" fill="currentColor"  d=""/>
   </svg>
 </template>
 

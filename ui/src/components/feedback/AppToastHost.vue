@@ -9,8 +9,8 @@ import {
 } from 'lucide-vue-next'
 import { computed } from 'vue'
 import { Button } from '../ui/button/index'
-import { useToastStore } from '../../composables/useToast'
-import type { ToastItem, ToastTone } from '../../composables/useToast'
+import { useToastStore } from '@/composables/useToast.ts'
+import type { ToastItem, ToastTone } from '@/composables/useToast.ts'
 
 const { state, visibleToasts, queuedToasts, dismissToast, runToastAction } = useToastStore()
 

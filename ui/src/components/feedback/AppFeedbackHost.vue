@@ -5,8 +5,8 @@ import type { UnlistenFn } from '@tauri-apps/api/event'
 import { onMounted, onUnmounted } from 'vue'
 import AppConfirmHost from './AppConfirmHost.vue'
 import AppToastHost from './AppToastHost.vue'
-import { toast } from '../../composables/useToast'
-import type { ToastTone } from '../../composables/useToast'
+import { toast } from '@/composables/useToast.ts'
+import type { ToastTone } from '@/composables/useToast.ts'
 
 interface SessionEvent {
   client_id: string
