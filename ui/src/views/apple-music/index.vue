@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card'
-import { showAppNotice } from '../../composables/useNotice'
+import { toast } from '../../composables/useToast'
 import MediaPlayerCard from '../features/components/MediaPlayerCard.vue'
 import type {
   FeatureCommand,
@@ -69,10 +69,10 @@ async function loadSnapshot(options: { notify?: boolean } = {}) {
   try {
     snapshot.value = await invoke<FeatureSnapshot>('get_feature_snapshot')
     if (options.notify) {
-      showAppNotice({ message: '状态已刷新' })
+      toast.success({ message: '状态已刷新' })
     }
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '刷新失败',
       message: String(error),
       tone: 'warning',
@@ -103,9 +103,9 @@ async function runAppleMusicCommand(command: FeatureCommand, successMessage?: st
     const result = await invoke<FeatureExecutionResult>('execute_feature_command', { command })
     syncAppleMusicResult(result)
     await loadSnapshot()
-    showAppNotice({ message: successMessage ?? result.message })
+    toast.success({ message: successMessage ?? result.message })
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '执行失败',
       message: String(error),
       tone: 'warning',

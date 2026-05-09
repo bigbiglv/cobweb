@@ -21,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
+import { toast } from '../../composables/useToast'
 import type { PeripheralDevice } from './types'
 
 const devices = ref<PeripheralDevice[]>([])
@@ -92,6 +93,10 @@ async function refreshDevices() {
     devices.value = mergeDeviceBatteryFallback(nextDevices, devices.value)
   } catch (error) {
     deviceError.value = '外设刷新失败'
+    toast.warning({
+      title: '外设刷新失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
     console.error('Failed to load peripheral devices:', error)
   } finally {
     refreshingDevices.value = false
@@ -241,6 +246,10 @@ onMounted(async () => {
     webConsoleStatus.value = await invoke<WebConsoleStatus>('get_web_console_status')
     await refreshDevices()
   } catch (error) {
+    toast.warning({
+      title: '状态读取失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
     console.error('Failed to load peripheral devices:', error)
   }
 })

@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card'
-import { showAppNotice } from '../../composables/useNotice'
+import { toast } from '../../composables/useToast'
 
 interface AudioOutputDevice {
   id: string
@@ -65,10 +65,10 @@ async function loadPageData(options: { notify?: boolean } = {}) {
     appRoutes.value = nextRoutes
 
     if (options.notify) {
-      showAppNotice({ message: '音频状态已刷新' })
+      toast.success({ message: '音频状态已刷新' })
     }
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '读取失败',
       message: String(error),
       tone: 'warning',
@@ -104,9 +104,9 @@ async function setDefaultDevice(device: AudioOutputDevice) {
     devices.value = await invoke<AudioOutputDevice[]>('set_default_audio_output_device', {
       deviceId: device.id,
     })
-    showAppNotice({ message: `默认输出已切换到 ${device.name}` })
+    toast.success({ message: `默认输出已切换到 ${device.name}` })
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '切换失败',
       message: String(error),
       tone: 'warning',
@@ -132,7 +132,7 @@ async function setDeviceVolume(device: AudioOutputDevice, level: number) {
       level: nextLevel,
     })
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '音量调整失败',
       message: String(error),
       tone: 'warning',
@@ -157,9 +157,9 @@ async function setAppRoute(route: AudioAppRoute, deviceId: string | null) {
       appId: route.appId,
       deviceId,
     })
-    showAppNotice({ message: `${route.appName} 输出偏好已保存` })
+    toast.success({ message: `${route.appName} 输出偏好已保存` })
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '保存失败',
       message: String(error),
       tone: 'warning',

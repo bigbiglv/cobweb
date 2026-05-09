@@ -7,6 +7,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button } from '../ui/button/index'
 import { useTheme } from '../../composables/use-theme'
 import { useUpdater } from '../../composables/use-updater'
+import { toast } from '../../composables/useToast'
 
 interface SourceRect {
   left: number
@@ -285,6 +286,7 @@ async function toggleCloseBehavior() {
     closeToTrayOnClose.value = behavior.closeToTrayOnClose
   } catch {
     closeToTrayOnClose.value = !nextValue
+    toast.warning({ message: '关闭按钮设置保存失败' })
   } finally {
     closeBehaviorPending.value = false
   }
@@ -310,6 +312,7 @@ async function toggleStartupBehavior() {
     launchOnStartup.value = behavior.launchOnStartup
   } catch {
     launchOnStartup.value = !nextValue
+    toast.warning({ message: '开机自启设置保存失败' })
   } finally {
     startupBehaviorPending.value = false
   }
@@ -324,6 +327,10 @@ async function toggleAutoUpdateBehavior() {
     await setAutoUpdateEnabled(!autoUpdateEnabled.value)
   } catch (error) {
     console.error('切换自动更新失败', error)
+    toast.warning({
+      title: '保存失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
   }
 }
 

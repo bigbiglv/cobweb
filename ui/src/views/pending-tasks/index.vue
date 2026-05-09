@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
+import { toast } from '../../composables/useToast'
 
 interface TaskOrigin {
   kind: 'pc' | 'mobile' | 'web'
@@ -47,6 +48,10 @@ async function fetchTasks() {
     loading.value = true
     tasks.value = await invoke<PendingTask[]>('get_pending_tasks')
   } catch (error) {
+    toast.warning({
+      title: '读取失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
     console.error('Failed to load pending tasks:', error)
   } finally {
     loading.value = false

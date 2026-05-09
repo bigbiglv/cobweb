@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check, type DownloadEvent, type Update } from '@tauri-apps/plugin-updater'
 import { computed, markRaw, ref, shallowRef } from 'vue'
-import { showAppNotice } from './useNotice'
+import { toast } from './useToast'
 
 const updateInfo = shallowRef<Update | null>(null)
 const checking = ref(false)
@@ -88,7 +88,7 @@ async function setAutoUpdateEnabled(enabled: boolean) {
 async function checkForUpdate(options: CheckForUpdateOptions = {}) {
   if (!shouldCheckForUpdate()) {
     if (options.notify) {
-      showAppNotice({
+      toast.warning({
         title: '检查更新',
         message: '开发模式不会检查线上更新',
         tone: 'warning',
@@ -107,7 +107,7 @@ async function checkForUpdate(options: CheckForUpdateOptions = {}) {
     await refreshUpdateInfo()
 
     if (options.notify) {
-      showAppNotice(
+      toast(
         updateInfo.value
           ? {
               title: '发现新版本',
@@ -122,7 +122,7 @@ async function checkForUpdate(options: CheckForUpdateOptions = {}) {
   } catch (error) {
     console.error('检查更新失败', error)
     if (options.notify) {
-      showAppNotice({
+      toast.warning({
         title: '检查失败',
         message: formatUpdateError(error),
         tone: 'warning',
@@ -144,7 +144,7 @@ async function installUpdate() {
   downloadedBytes.value = 0
   totalBytes.value = null
 
-  showAppNotice({
+  toast({
     title: '开始更新',
     message: `正在下载 ${update.version}`,
   })
@@ -152,14 +152,14 @@ async function installUpdate() {
   try {
     await update.downloadAndInstall(handleDownloadEvent)
 
-    showAppNotice({
+    toast({
       title: '更新完成',
       message: '即将重启应用完成安装',
     })
     updateInfo.value = null
   } catch (error) {
     console.error('安装更新失败', error)
-    showAppNotice({
+    toast.warning({
       title: '更新失败',
       message: `${formatUpdateError(error)}，可重新点击更新按钮重试`,
       tone: 'warning',
@@ -181,7 +181,7 @@ async function installUpdate() {
     await relaunch()
   } catch (error) {
     console.error('重启应用失败', error)
-    showAppNotice({
+    toast.warning({
       title: '重启失败',
       message: '更新已安装，请手动重启应用',
       tone: 'warning',

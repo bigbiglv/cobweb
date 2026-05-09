@@ -11,6 +11,7 @@ import type { UnlistenFn } from '@tauri-apps/api/event'
 import { Badge } from '../../components/ui/badge/index'
 import { Button } from '../../components/ui/button/index'
 import { confirmDialog } from '../../composables/useConfirm'
+import { toast } from '../../composables/useToast'
 import {
   Card,
   CardContent,
@@ -25,12 +26,15 @@ const selectedFiles = ref<File[]>([])
 const text = ref('')
 const loading = ref(true)
 const sending = ref(false)
-const actionMessage = ref('')
 const webPort = ref<number | null>(null)
 
 let unlistenSyncChanged: UnlistenFn | null = null
 
 const totalFiles = computed(() => messages.value.reduce((sum, item) => sum + item.attachments.length, 0))
+
+function errorMessage(error: unknown) {
+  return String(error instanceof Error ? error.message : error)
+}
 
 function serverBaseUrl() {
   if (!webPort.value) {
@@ -59,7 +63,10 @@ async function fetchMessages() {
     await loadWebStatus()
     messages.value = await invoke<ClipboardSyncMessage[]>('get_clipboard_sync_messages')
   } catch (error) {
-    actionMessage.value = String(error instanceof Error ? error.message : error)
+    toast.warning({
+      title: '读取失败',
+      message: errorMessage(error),
+    })
   } finally {
     loading.value = false
   }
@@ -72,7 +79,7 @@ function handleFiles(event: Event) {
 
 async function submitMessage() {
   if (!text.value.trim() && selectedFiles.value.length === 0) {
-    actionMessage.value = '请输入文本或选择文件'
+    toast.warning({ message: '请输入文本或选择文件' })
     return
   }
 
@@ -101,9 +108,12 @@ async function submitMessage() {
     selectedFiles.value = []
     const input = document.querySelector<HTMLInputElement>('#pc-sync-files')
     if (input) input.value = ''
-    actionMessage.value = '已发送'
+    toast.success({ message: '已发送' })
   } catch (error) {
-    actionMessage.value = String(error instanceof Error ? error.message : error)
+    toast.warning({
+      title: '发送失败',
+      message: errorMessage(error),
+    })
   } finally {
     sending.value = false
   }
@@ -112,9 +122,12 @@ async function submitMessage() {
 async function copyMessageText(message: ClipboardSyncMessage) {
   try {
     await invoke('copy_clipboard_sync_text', { messageId: message.messageId })
-    actionMessage.value = '已复制文本'
+    toast.success({ message: '已复制文本' })
   } catch (error) {
-    actionMessage.value = String(error instanceof Error ? error.message : error)
+    toast.warning({
+      title: '复制失败',
+      message: errorMessage(error),
+    })
   }
 }
 
@@ -124,9 +137,12 @@ async function copyMessageImages(message: ClipboardSyncMessage, attachments: Cli
       messageId: message.messageId,
       attachmentIds: attachments.map((attachment) => attachment.attachmentId),
     })
-    actionMessage.value = attachments.length > 1 ? '已复制全部图片' : '已复制图片'
+    toast.success({ message: attachments.length > 1 ? '已复制全部图片' : '已复制图片' })
   } catch (error) {
-    actionMessage.value = String(error instanceof Error ? error.message : error)
+    toast.warning({
+      title: '复制失败',
+      message: errorMessage(error),
+    })
   }
 }
 
@@ -142,8 +158,12 @@ async function deleteMessage(message: ClipboardSyncMessage) {
   try {
     await invoke('delete_clipboard_sync_message', { messageId: message.messageId })
     messages.value = messages.value.filter((item) => item.messageId !== message.messageId)
+    toast.success({ message: '已删除' })
   } catch (error) {
-    actionMessage.value = String(error instanceof Error ? error.message : error)
+    toast.warning({
+      title: '删除失败',
+      message: errorMessage(error),
+    })
   }
 }
 
@@ -159,8 +179,12 @@ async function clearMessages() {
   try {
     await invoke('clear_clipboard_sync_messages')
     messages.value = []
+    toast.success({ message: '已清空' })
   } catch (error) {
-    actionMessage.value = String(error instanceof Error ? error.message : error)
+    toast.warning({
+      title: '清空失败',
+      message: errorMessage(error),
+    })
   }
 }
 
@@ -251,8 +275,6 @@ onUnmounted(() => {
             </Button>
           </div>
         </form>
-
-        <p v-if="actionMessage" class="text-sm text-muted-foreground">{{ actionMessage }}</p>
 
         <div
           v-if="loading"

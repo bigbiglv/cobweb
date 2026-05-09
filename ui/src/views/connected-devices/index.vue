@@ -7,6 +7,7 @@ import type { UnlistenFn } from '@tauri-apps/api/event'
 import { Badge } from '../../components/ui/badge/index'
 import { Button } from '../../components/ui/button/index'
 import { confirmDialog } from '../../composables/useConfirm'
+import { toast } from '../../composables/useToast'
 import {
   Card,
   CardContent,
@@ -62,6 +63,10 @@ async function fetchClients() {
     loading.value = true
     clients.value = await invoke<ClientInfo[]>('get_clients_with_status')
   } catch (error) {
+    toast.warning({
+      title: '读取失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
     console.error('Failed to get paired clients:', error)
   } finally {
     loading.value = false
@@ -76,6 +81,10 @@ async function fetchMdnsStatus() {
     const status = await invoke<MdnsStatus>('get_mdns_status')
     mdnsEnabled.value = status.enabled
   } catch (error) {
+    toast.warning({
+      title: '读取失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
     console.error('Failed to get mdns status:', error)
   }
 }
@@ -90,8 +99,13 @@ async function toggleMdns() {
       enabled: !mdnsEnabled.value,
     })
     mdnsEnabled.value = status.enabled
+    toast.success({ message: status.enabled ? '发现服务已开启' : '发现服务已关闭' })
   } catch (error) {
     console.error('Failed to toggle mdns:', error)
+    toast.warning({
+      title: '切换失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
   } finally {
     mdnsPending.value = false
   }
@@ -115,8 +129,13 @@ async function forgetDevice(client: ClientInfo) {
   try {
     await invoke('remove_paired_client', { clientId: client.client_id })
     await fetchClients()
+    toast.success({ message: '设备已移除' })
   } catch (error) {
     console.error('Failed to remove client:', error)
+    toast.warning({
+      title: '移除失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
   }
 }
 

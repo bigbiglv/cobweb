@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
+import { toast } from '../../composables/useToast'
 
 interface TaskOrigin {
   kind: 'pc' | 'mobile' | 'web'
@@ -44,6 +45,10 @@ async function fetchHistory() {
     loading.value = true
     history.value = await invoke<TaskHistoryEntry[]>('get_task_history_entries')
   } catch (error) {
+    toast.warning({
+      title: '读取失败',
+      message: String(error instanceof Error ? error.message : error),
+    })
     console.error('Failed to load task history:', error)
   } finally {
     loading.value = false

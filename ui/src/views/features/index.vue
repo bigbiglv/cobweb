@@ -6,7 +6,7 @@ import {
   CardContent,
 } from '../../components/ui/card/index'
 import { confirmDialog } from '../../composables/useConfirm'
-import { showAppNotice } from '../../composables/useNotice'
+import { toast } from '../../composables/useToast'
 import ActionCard from './components/ActionCard.vue'
 import MediaPlayerCard from './components/MediaPlayerCard.vue'
 import RangeCard from './components/RangeCard.vue'
@@ -100,7 +100,7 @@ async function loadPageData(options: { notify?: boolean } = {}) {
     appleMusicTrack.value = null
     loading.value = false
     if (options.notify) {
-      showAppNotice({ title: '刷新完成', message: '演示数据已刷新' })
+      toast.success({ title: '刷新完成', message: '演示数据已刷新' })
     }
     return
   }
@@ -122,10 +122,10 @@ async function loadPageData(options: { notify?: boolean } = {}) {
     currentVolume.value = snapshot.volumeLevel
     appleMusicTrack.value = snapshot.appleMusicTrack
     if (options.notify) {
-      showAppNotice({ title: '刷新完成', message: '状态已更新' })
+      toast.success({ title: '刷新完成', message: '状态已更新' })
     }
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '刷新失败',
       message: `无法载入状态：${String(error)}`,
       tone: 'warning',
@@ -142,7 +142,7 @@ async function refreshSnapshot() {
     window.setTimeout(() => {
       currentVolume.value = 42
       snapshotRefreshing.value = false
-      showAppNotice({ title: '刷新完成', message: '音量已更新' })
+      toast.success({ title: '刷新完成', message: '音量已更新' })
     }, 400)
     return
   }
@@ -153,9 +153,9 @@ async function refreshSnapshot() {
     const snapshot = await invoke<FeatureSnapshot>('get_feature_snapshot')
     currentVolume.value = snapshot.volumeLevel
     appleMusicTrack.value = snapshot.appleMusicTrack
-    showAppNotice({ title: '刷新完成', message: `当前音量 ${snapshot.volumeLevel}%` })
+    toast.success({ title: '刷新完成', message: `当前音量 ${snapshot.volumeLevel}%` })
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '刷新失败',
       message: `音量刷新失败：${String(error)}`,
       tone: 'warning',
@@ -170,7 +170,7 @@ async function runCommand(feature: FeatureDefinition, command: FeatureCommand) {
     activeFeatureKey.value = feature.featureKey
     window.setTimeout(() => {
       activeFeatureKey.value = null
-      showAppNotice({
+      toast.success({
         message: command.feature === 'volume'
           ? `音量已设置为 ${currentVolume.value}%`
           : `${feature.title} 已执行`,
@@ -193,9 +193,9 @@ async function runCommand(feature: FeatureDefinition, command: FeatureCommand) {
       await loadPageData()
     }
 
-    showAppNotice({ message: result.message })
+    toast.success({ message: result.message })
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '执行失败',
       message: `${feature.title} 执行失败：${String(error)}`,
       tone: 'warning',
@@ -217,11 +217,11 @@ function buildActionCommand(feature: ActionFeatureDefinition): FeatureCommand {
 
 function handleTestAction() {
   testPending.value = true
-  showAppNotice({ title: '执行中', message: '演示进行中' })
+  toast.info({ title: '执行中', message: '演示进行中' })
 
   testTimer = window.setTimeout(() => {
     testPending.value = false
-    showAppNotice({ message: '演示已完成' })
+    toast.success({ message: '演示已完成' })
     testTimer = null
   }, 5000)
 }
@@ -233,12 +233,12 @@ function handleCancelTestAction() {
   }
 
   testStopping.value = true
-  showAppNotice({ title: '停止中', message: '正在停止演示' })
+  toast.info({ title: '停止中', message: '正在停止演示' })
 
   window.setTimeout(() => {
     testStopping.value = false
     testPending.value = false
-    showAppNotice({ message: '演示已停止' })
+    toast.success({ message: '演示已停止' })
   }, 1500)
 }
 
@@ -263,7 +263,7 @@ async function handleAction(feature: ActionFeatureDefinition) {
   try {
     await runCommand(feature, buildActionCommand(feature))
   } catch (error) {
-    showAppNotice({
+    toast.warning({
       title: '执行失败',
       message: String(error instanceof Error ? error.message : error),
       tone: 'warning',
@@ -277,7 +277,7 @@ function handleCancel(feature: ActionFeatureDefinition) {
     return
   }
 
-  showAppNotice({
+  toast.warning({
     title: '操作提示',
     message: `${feature.title} 当前不支持中途取消`,
     tone: 'warning',
