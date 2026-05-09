@@ -261,6 +261,58 @@ pub fn attachment_path(
     Ok((dir.join(&attachment.stored_name), attachment))
 }
 
+fn unique_target_path(directory: &Path, file_name: &str) -> PathBuf {
+    let target = directory.join(file_name);
+    if !target.exists() {
+        return target;
+    }
+
+    let source = Path::new(file_name);
+    let stem = source
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("file");
+    let extension = source.extension().and_then(|value| value.to_str());
+
+    // 避免覆盖用户目录中已有文件，重复文件名按系统常见格式追加序号。
+    for index in 1.. {
+        let next_name = match extension {
+            Some(extension) if !extension.is_empty() => format!("{stem} ({index}).{extension}"),
+            _ => format!("{stem} ({index})"),
+        };
+        let next_target = directory.join(next_name);
+        if !next_target.exists() {
+            return next_target;
+        }
+    }
+
+    target
+}
+
+pub fn save_attachments_to_directory(
+    message_id: &str,
+    attachment_ids: &[String],
+    directory: &Path,
+) -> Result<usize, String> {
+    if attachment_ids.is_empty() {
+        return Err("请选择要下载的附件".into());
+    }
+    if !directory.is_dir() {
+        return Err("保存目录不存在".into());
+    }
+
+    let mut saved_count = 0;
+    for attachment_id in attachment_ids {
+        let (source, attachment) = attachment_path(message_id, attachment_id)?;
+        let target = unique_target_path(directory, &attachment.file_name);
+        fs::copy(&source, target).map_err(|error| error.to_string())?;
+        saved_count += 1;
+    }
+
+    Ok(saved_count)
+}
+
 pub fn write_message_to_clipboard(message: &ClipboardSyncMessage) -> Result<(), String> {
     let paths = message
         .attachments

@@ -424,6 +424,22 @@ fn copy_clipboard_sync_attachments(
 }
 
 #[tauri::command]
+fn download_clipboard_sync_attachments(
+    message_id: String,
+    attachment_ids: Vec<String>,
+) -> Result<Option<usize>, String> {
+    let Some(directory) = rfd::FileDialog::new()
+        .set_title("选择保存目录")
+        .pick_folder()
+    else {
+        return Ok(None);
+    };
+
+    clipboard_sync::save_attachments_to_directory(&message_id, &attachment_ids, &directory)
+        .map(Some)
+}
+
+#[tauri::command]
 fn delete_clipboard_sync_message(app: tauri::AppHandle, message_id: String) -> Result<(), String> {
     clipboard_sync::delete_message(&message_id)?;
     network::server::broadcast_clipboard_sync();
@@ -738,6 +754,7 @@ pub fn run() {
             copy_clipboard_sync_message,
             copy_clipboard_sync_text,
             copy_clipboard_sync_attachments,
+            download_clipboard_sync_attachments,
             delete_clipboard_sync_message,
             clear_clipboard_sync_messages,
             remove_paired_client,

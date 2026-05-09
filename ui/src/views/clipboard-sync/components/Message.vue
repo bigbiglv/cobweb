@@ -8,8 +8,10 @@ import {
   Trash2,
 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
+import { invoke, isTauri } from '@tauri-apps/api/core'
 import { Badge } from '../../../components/ui/badge'
 import { Button } from '../../../components/ui/button'
+import { toast } from '../../../composables/useToast'
 import type { ClipboardSyncMessage, ClipboardSyncAttachment, ClipboardSyncSource } from '../types.ts'
 
 interface Props {
@@ -105,7 +107,11 @@ function shiftImages(direction: -1 | 1) {
   imageWindowStart.value = Math.min(maxStart, Math.max(0, imageWindowStart.value + direction))
 }
 
-function downloadAttachment(attachment: ClipboardSyncAttachment) {
+function errorMessage(error: unknown) {
+  return String(error instanceof Error ? error.message : error)
+}
+
+function browserDownloadAttachment(attachment: ClipboardSyncAttachment) {
   const link = document.createElement('a')
   link.href = fileUrl(props.message, attachment)
   link.download = attachment.fileName
@@ -115,10 +121,31 @@ function downloadAttachment(attachment: ClipboardSyncAttachment) {
   link.remove()
 }
 
-function downloadImages(attachments: ClipboardSyncAttachment[]) {
-  attachments.forEach((attachment, index) => {
-    window.setTimeout(() => downloadAttachment(attachment), index * 120)
-  })
+async function downloadAttachments(attachments: ClipboardSyncAttachment[]) {
+  if (!attachments.length)
+    return
+
+  if (!isTauri()) {
+    attachments.forEach((attachment, index) => {
+      window.setTimeout(() => browserDownloadAttachment(attachment), index * 120)
+    })
+    return
+  }
+
+  try {
+    const savedCount = await invoke<number | null>('download_clipboard_sync_attachments', {
+      messageId: props.message.messageId,
+      attachmentIds: attachments.map((attachment) => attachment.attachmentId),
+    })
+    if (savedCount) {
+      toast.success({ message: `已保存 ${savedCount} 个附件` })
+    }
+  } catch (error) {
+    toast.warning({
+      title: '下载失败',
+      message: errorMessage(error),
+    })
+  }
 }
 </script>
 
@@ -176,10 +203,8 @@ function downloadImages(attachments: ClipboardSyncAttachment[]) {
               class="image-deck-card"
               :style="imageCardStyle(attachment, index, visibleImageAttachments.length)"
             >
-              <a
+              <div
                 class="block overflow-hidden rounded-xl bg-muted/70"
-                :href="fileUrl(message, attachment)"
-                :download="attachment.fileName"
                 :title="attachment.fileName"
               >
                 <img
@@ -187,7 +212,7 @@ function downloadImages(attachments: ClipboardSyncAttachment[]) {
                   :src="fileUrl(message, attachment)"
                   :alt="attachment.fileName"
                 >
-              </a>
+              </div>
               <div class="grid grid-cols-2 gap-1.5">
                 <Button
                   variant="outline"
@@ -200,14 +225,12 @@ function downloadImages(attachments: ClipboardSyncAttachment[]) {
                   <ClipboardCopy class="size-3.5" />
                 </Button>
                 <Button
-                  as="a"
                   variant="outline"
                   size="sm"
                   class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
-                  :href="fileUrl(message, attachment)"
-                  :download="attachment.fileName"
                   :aria-label="`下载 ${attachment.fileName}`"
                   :title="`下载 ${attachment.fileName}`"
+                  @click="downloadAttachments([attachment])"
                 >
                   <Download class="size-3.5" />
                 </Button>
@@ -234,7 +257,7 @@ function downloadImages(attachments: ClipboardSyncAttachment[]) {
                 class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
                 :aria-label="`下载全部图片`"
                 title="下载全部图片"
-                @click="downloadImages(imageAttachments)"
+                @click="downloadAttachments(imageAttachments)"
             >
               <Download class="size-3.5" />
             </Button>
@@ -251,12 +274,12 @@ function downloadImages(attachments: ClipboardSyncAttachment[]) {
           </div>
         </div>
         <div v-if="fileAttachments.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <a
+          <button
             v-for="attachment in fileAttachments"
             :key="attachment.attachmentId"
-            class="group grid min-w-0 gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 text-foreground no-underline transition hover:border-primary/50"
-            :href="fileUrl(message, attachment)"
-            :download="attachment.fileName"
+            type="button"
+            class="group grid min-w-0 gap-2 rounded-2xl border border-border/70 bg-card/70 p-3 text-left text-foreground no-underline transition hover:border-primary/50"
+            @click="downloadAttachments([attachment])"
           >
             <div class="flex aspect-[1.45] w-full items-center justify-center rounded-xl bg-muted/70 text-muted-foreground">
               <FileText class="size-8" />
@@ -269,7 +292,7 @@ function downloadImages(attachments: ClipboardSyncAttachment[]) {
               <Download class="size-3.5" />
               {{ formatFileSize(attachment.sizeBytes) }}
             </span>
-          </a>
+          </button>
         </div>
       </div>
     </div>
