@@ -53,7 +53,7 @@ watch(
 </script>
 
 <template>
-  <Button>
+  <Button variant="outline">
     <DrawIcon
       v-if="showSuccess"
       class="refresh-icon refresh-icon--success"
