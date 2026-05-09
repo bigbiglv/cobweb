@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue"
 import Button from './Button.vue'
-import DrawIcon from "@/components/common/DrawIcon.vue"
-import MorphIcon from "@/components/common/MorphIcon.vue"
+import DrawIcon from "@/components/animatedIcons/mid/DrawIcon.vue"
+import MorphIcon from "@/components/animatedIcons/mid/MorphIcon.vue"
 import { mdiSync, mdiLoading, mdiCheck } from '@mdi/js'
 
 interface Props {
