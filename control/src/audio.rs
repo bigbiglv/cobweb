@@ -10,8 +10,8 @@ use std::os::windows::process::CommandExt;
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
 #[cfg(target_os = "windows")]
 use windows::Win32::Media::Audio::{
-    eConsole, eRender, DEVICE_STATE_ACTIVE, Endpoints::IAudioEndpointVolume, IMMDevice,
-    IMMDeviceEnumerator, MMDeviceEnumerator,
+    eConsole, eRender, Endpoints::IAudioEndpointVolume, IMMDevice, IMMDeviceEnumerator,
+    MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
 };
 #[cfg(target_os = "windows")]
 use windows::Win32::System::Com::{
@@ -42,7 +42,9 @@ impl Display for AudioRoutingError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::UnsupportedPlatform(message) => write!(f, "{message}"),
-            Self::InvalidVolumeLevel(level) => write!(f, "音量必须在 0 到 100 之间，当前值为 {level}"),
+            Self::InvalidVolumeLevel(level) => {
+                write!(f, "音量必须在 0 到 100 之间，当前值为 {level}")
+            }
             Self::DeviceNotFound(id) => write!(f, "找不到音频输出设备：{id}"),
             Self::CommandFailed(message) => write!(f, "{message}"),
             Self::WindowsApi(message) => write!(f, "{message}"),
@@ -62,21 +64,24 @@ pub fn list_output_devices() -> Result<Vec<AudioOutputDevice>, AudioRoutingError
                 .and_then(|device| device_id(&device).ok());
             let collection = enumerator
                 .EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
-                .map_err(|error| AudioRoutingError::WindowsApi(format!("枚举音频输出设备失败: {error}")))?;
-            let count = collection
-                .GetCount()
-                .map_err(|error| AudioRoutingError::WindowsApi(format!("读取音频输出设备数量失败: {error}")))?;
+                .map_err(|error| {
+                    AudioRoutingError::WindowsApi(format!("枚举音频输出设备失败: {error}"))
+                })?;
+            let count = collection.GetCount().map_err(|error| {
+                AudioRoutingError::WindowsApi(format!("读取音频输出设备数量失败: {error}"))
+            })?;
             let mut devices = Vec::new();
 
             for index in 0..count {
-                let device = collection
-                    .Item(index)
-                    .map_err(|error| AudioRoutingError::WindowsApi(format!("读取音频输出设备失败: {error}")))?;
+                let device = collection.Item(index).map_err(|error| {
+                    AudioRoutingError::WindowsApi(format!("读取音频输出设备失败: {error}"))
+                })?;
                 let id = device_id(&device)?;
                 let (volume, muted) = read_endpoint_volume(&device)?;
 
                 devices.push(AudioOutputDevice {
-                    name: device_name(&device).unwrap_or_else(|_| format!("输出设备 {}", index + 1)),
+                    name: device_name(&device)
+                        .unwrap_or_else(|_| format!("输出设备 {}", index + 1)),
                     is_default: default_id.as_deref() == Some(id.as_str()),
                     id,
                     volume,
@@ -184,14 +189,20 @@ pub fn set_output_device_volume(device_id: &str, level: u8) -> Result<u8, AudioR
                 .map_err(|_| AudioRoutingError::DeviceNotFound(device_id.into()))?;
             let endpoint = device
                 .Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None)
-                .map_err(|error| AudioRoutingError::WindowsApi(format!("激活音量控制接口失败: {error}")))?;
+                .map_err(|error| {
+                    AudioRoutingError::WindowsApi(format!("激活音量控制接口失败: {error}"))
+                })?;
 
             endpoint
                 .SetMasterVolumeLevelScalar(level as f32 / 100.0, std::ptr::null())
-                .map_err(|error| AudioRoutingError::WindowsApi(format!("设置设备音量失败: {error}")))?;
+                .map_err(|error| {
+                    AudioRoutingError::WindowsApi(format!("设置设备音量失败: {error}"))
+                })?;
             endpoint
                 .SetMute(level == 0, std::ptr::null())
-                .map_err(|error| AudioRoutingError::WindowsApi(format!("设置设备静音状态失败: {error}")))?;
+                .map_err(|error| {
+                    AudioRoutingError::WindowsApi(format!("设置设备静音状态失败: {error}"))
+                })?;
 
             Ok(level)
         })

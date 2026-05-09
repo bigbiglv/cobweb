@@ -10,13 +10,14 @@ import { listen } from '@tauri-apps/api/event'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { Badge } from '../../components/ui/badge/index'
 import { Button } from '../../components/ui/button/index'
+import { confirmDialog } from '../../composables/useConfirm'
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from '../../components/ui/card/index'
-import type { ClipboardSyncMessage, WebConsoleStatus, ClipboardSyncResponse } from './types.ts'
+import type { ClipboardSyncMessage, WebConsoleStatus, ClipboardSyncResponse, ClipboardSyncAttachment } from './types.ts'
 import Message from './components/Message.vue'
 
 const messages = ref<ClipboardSyncMessage[]>([])
@@ -108,17 +109,34 @@ async function submitMessage() {
   }
 }
 
-async function copyMessage(message: ClipboardSyncMessage) {
+async function copyMessageText(message: ClipboardSyncMessage) {
   try {
-    await invoke('copy_clipboard_sync_message', { messageId: message.messageId })
-    actionMessage.value = '已复制到剪切板'
+    await invoke('copy_clipboard_sync_text', { messageId: message.messageId })
+    actionMessage.value = '已复制文本'
+  } catch (error) {
+    actionMessage.value = String(error instanceof Error ? error.message : error)
+  }
+}
+
+async function copyMessageImages(message: ClipboardSyncMessage, attachments: ClipboardSyncAttachment[]) {
+  try {
+    await invoke('copy_clipboard_sync_attachments', {
+      messageId: message.messageId,
+      attachmentIds: attachments.map((attachment) => attachment.attachmentId),
+    })
+    actionMessage.value = attachments.length > 1 ? '已复制全部图片' : '已复制图片'
   } catch (error) {
     actionMessage.value = String(error instanceof Error ? error.message : error)
   }
 }
 
 async function deleteMessage(message: ClipboardSyncMessage) {
-  if (!window.confirm('确认删除这条记录吗？'))
+  if (!await confirmDialog({
+    title: '删除同步记录',
+    message: '确认删除这条记录吗？该操作不可撤销。',
+    confirmText: '删除',
+    tone: 'danger',
+  }))
     return
 
   try {
@@ -130,7 +148,12 @@ async function deleteMessage(message: ClipboardSyncMessage) {
 }
 
 async function clearMessages() {
-  if (!window.confirm('确认清空全部同步记录吗？'))
+  if (!await confirmDialog({
+    title: '清空同步记录',
+    message: '确认清空全部同步记录吗？该操作不可撤销。',
+    confirmText: '清空',
+    tone: 'danger',
+  }))
     return
 
   try {
@@ -244,7 +267,8 @@ onUnmounted(() => {
             :key="message.messageId"
             :message="message"
             :server-url="serverBaseUrl()"
-            @copy="copyMessage"
+            @copy-text="copyMessageText"
+            @copy-images="copyMessageImages"
             @delete="deleteMessage"
           />
         </div>

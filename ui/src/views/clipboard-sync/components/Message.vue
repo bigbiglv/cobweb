@@ -20,7 +20,8 @@ interface Props {
 const props = defineProps<Props>()
 
 const emits = defineEmits<{
-  copy: [message: ClipboardSyncMessage]
+  'copy-text': [message: ClipboardSyncMessage]
+  'copy-images': [message: ClipboardSyncMessage, attachments: ClipboardSyncAttachment[]]
   delete: [message: ClipboardSyncMessage]
 }>()
 
@@ -103,100 +104,152 @@ function shiftImages(direction: -1 | 1) {
   const maxStart = Math.max(0, imageAttachments.value.length - maxVisibleImages)
   imageWindowStart.value = Math.min(maxStart, Math.max(0, imageWindowStart.value + direction))
 }
+
+function downloadAttachment(attachment: ClipboardSyncAttachment) {
+  const link = document.createElement('a')
+  link.href = fileUrl(props.message, attachment)
+  link.download = attachment.fileName
+  link.rel = 'noopener'
+  document.body.append(link)
+  link.click()
+  link.remove()
+}
+
+function downloadImages(attachments: ClipboardSyncAttachment[]) {
+  attachments.forEach((attachment, index) => {
+    window.setTimeout(() => downloadAttachment(attachment), index * 120)
+  })
+}
 </script>
 
 <template>
   <article class="rounded-[1.75rem] border border-border/70 bg-background/70 p-5">
     <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div class="min-w-0 flex-1 space-y-4">
-        <div class="flex flex-wrap items-end gap-2">
-          <Badge class="rounded-full">{{ sourceBadge(message.source) }}</Badge>
-          <h3 class="text-base font-semibold tracking-[-0.02em]">
-            {{ formatTime(message.createdAtMs) }}
-          </h3>
-          <span class="text-sm text-muted-foreground">
-            {{ sourceName(message.source) }}
-          </span>
+        <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-end gap-2">
+            <Badge class="rounded-full">{{ sourceBadge(message.source) }}</Badge>
+            <h3 class="text-base font-semibold tracking-[-0.02em]">
+              {{ formatTime(message.createdAtMs) }}
+            </h3>
+            <span class="text-sm text-muted-foreground">
+              {{ sourceName(message.source) }}
+            </span>
+          </div>
+          <div>
+            <Button variant="outline" class="rounded-full" size="sm" @click="emits('delete', message)">
+              <Trash2 class="size-4" />
+            </Button>
+          </div>
         </div>
 
-        <p v-if="message.text" class="whitespace-pre-wrap break-words rounded-2xl bg-muted/50 p-4 text-sm leading-6">
-          {{ message.text }}
-        </p>
-
-        <div v-if="imageAttachments.length" class="image-deck">
-          <Button
-            v-if="imageAttachments.length > maxVisibleImages"
-            variant="outline"
-            size="icon-sm"
-            class="image-deck-nav left-2"
-            :disabled="!canShiftImagesPrev"
-            aria-label="上一组图片"
-            title="上一组图片"
-            @click="shiftImages(-1)"
-          >
-            <ChevronLeft class="size-4" />
-          </Button>
-
-          <article
-            v-for="(attachment, index) in visibleImageAttachments"
-            :key="attachment.attachmentId"
-            class="image-deck-card"
-            :style="imageCardStyle(attachment, index, visibleImageAttachments.length)"
-          >
-            <a
-              class="block overflow-hidden rounded-xl bg-muted/70"
-              :href="fileUrl(message, attachment)"
-              :download="attachment.fileName"
-              :title="attachment.fileName"
+        <div class="flex items-center gap-2" v-if="message.text">
+          <div class="flex-1">
+            <p class="whitespace-pre-wrap wrap-break-word rounded-2xl bg-muted/50 p-4 text-sm leading-6">
+              {{ message.text }}
+            </p>
+          </div>
+          <div>
+            <Button variant="outline" class="rounded-full" size="sm" @click="emits('copy-text', message)">
+              <ClipboardCopy class="size-4" />
+            </Button>
+          </div>
+        </div>
+        <div class="flex items-start gap-2" v-if="imageAttachments.length">
+          <div class="image-deck flex-1">
+            <Button
+              v-if="imageAttachments.length > maxVisibleImages"
+              variant="outline"
+              size="icon-sm"
+              class="image-deck-nav left-2"
+              :disabled="!canShiftImagesPrev"
+              aria-label="上一组图片"
+              title="上一组图片"
+              @click="shiftImages(-1)"
             >
-              <img
-                class="aspect-[4/5] w-full object-cover"
-                :src="fileUrl(message, attachment)"
-                :alt="attachment.fileName"
-              >
-            </a>
-            <div class="grid grid-cols-2 gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
-                :aria-label="`复制 ${attachment.fileName}`"
-                :title="`复制 ${attachment.fileName}`"
-                @click="emits('copy', message)"
-              >
-                <ClipboardCopy class="size-3.5" />
-                复制
-              </Button>
-              <Button
-                as="a"
-                variant="outline"
-                size="sm"
-                class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
+              <ChevronLeft class="size-4" />
+            </Button>
+
+            <article
+              v-for="(attachment, index) in visibleImageAttachments"
+              :key="attachment.attachmentId"
+              class="image-deck-card"
+              :style="imageCardStyle(attachment, index, visibleImageAttachments.length)"
+            >
+              <a
+                class="block overflow-hidden rounded-xl bg-muted/70"
                 :href="fileUrl(message, attachment)"
                 :download="attachment.fileName"
-                :aria-label="`下载 ${attachment.fileName}`"
-                :title="`下载 ${attachment.fileName}`"
+                :title="attachment.fileName"
               >
-                <Download class="size-3.5" />
-                下载
-              </Button>
-            </div>
-          </article>
+                <img
+                  class="aspect-[4/5] w-full object-cover"
+                  :src="fileUrl(message, attachment)"
+                  :alt="attachment.fileName"
+                >
+              </a>
+              <div class="grid grid-cols-2 gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
+                  :aria-label="`复制 ${attachment.fileName}`"
+                  :title="`复制 ${attachment.fileName}`"
+                  @click="emits('copy-images', message, [attachment])"
+                >
+                  <ClipboardCopy class="size-3.5" />
+                </Button>
+                <Button
+                  as="a"
+                  variant="outline"
+                  size="sm"
+                  class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
+                  :href="fileUrl(message, attachment)"
+                  :download="attachment.fileName"
+                  :aria-label="`下载 ${attachment.fileName}`"
+                  :title="`下载 ${attachment.fileName}`"
+                >
+                  <Download class="size-3.5" />
+                </Button>
+              </div>
+            </article>
 
-          <Button
-            v-if="imageAttachments.length > maxVisibleImages"
-            variant="outline"
-            size="icon-sm"
-            class="image-deck-nav right-2"
-            :disabled="!canShiftImagesNext"
-            aria-label="下一组图片"
-            title="下一组图片"
-            @click="shiftImages(1)"
-          >
-            <ChevronRight class="size-4" />
-          </Button>
+            <Button
+              v-if="imageAttachments.length > maxVisibleImages"
+              variant="outline"
+              size="icon-sm"
+              class="image-deck-nav right-2"
+              :disabled="!canShiftImagesNext"
+              aria-label="下一组图片"
+              title="下一组图片"
+              @click="shiftImages(1)"
+            >
+              <ChevronRight class="size-4" />
+            </Button>
+          </div>
+          <div class="flex flex-col items-center gap-2">
+            <Button
+                variant="outline"
+                size="sm"
+                class="h-8 rounded-full bg-background/90 px-1.5 text-[11px]"
+                :aria-label="`下载全部图片`"
+                title="下载全部图片"
+                @click="downloadImages(imageAttachments)"
+            >
+              <Download class="size-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              class="rounded-full"
+              size="sm"
+              aria-label="复制全部图片"
+              title="复制全部图片"
+              @click="emits('copy-images', message, imageAttachments)"
+            >
+              <ClipboardCopy class="size-4" />
+            </Button>
+          </div>
         </div>
-
         <div v-if="fileAttachments.length" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <a
             v-for="attachment in fileAttachments"
@@ -218,15 +271,6 @@ function shiftImages(direction: -1 | 1) {
             </span>
           </a>
         </div>
-      </div>
-
-      <div class="flex shrink-0 items-center gap-2">
-        <Button variant="outline" class="rounded-full" size="sm" @click="emits('copy', message)">
-          <ClipboardCopy class="size-4" />
-        </Button>
-        <Button variant="outline" class="rounded-full" size="sm" @click="emits('delete', message)">
-          <Trash2 class="size-4" />
-        </Button>
       </div>
     </div>
   </article>

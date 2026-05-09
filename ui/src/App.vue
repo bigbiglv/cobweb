@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import router from './router'
 import LogoLoading from './components/LogoLoading.vue'
 import PairDialog from './components/PairDialog.vue'
-import SessionNotice from './components/SessionNotice.vue'
+import AppFeedbackHost from './components/feedback/AppFeedbackHost.vue'
 
 const bootLoading = ref(true)
 const routeLoading = ref(false)
@@ -45,5 +45,5 @@ onBeforeUnmount(() => {
   <LogoLoading :show="showLoading" />
   <router-view />
   <PairDialog />
-  <SessionNotice />
+  <AppFeedbackHost />
 </template>

@@ -5,6 +5,7 @@ import {
   Card,
   CardContent,
 } from '../../components/ui/card/index'
+import { confirmDialog } from '../../composables/useConfirm'
 import { showAppNotice } from '../../composables/useNotice'
 import ActionCard from './components/ActionCard.vue'
 import MediaPlayerCard from './components/MediaPlayerCard.vue'
@@ -248,7 +249,12 @@ async function handleAction(feature: ActionFeatureDefinition) {
   }
 
   if (feature.control.confirmRequired) {
-    const confirmed = window.confirm(`确认执行“${feature.title}”吗？`)
+    const confirmed = await confirmDialog({
+      title: '确认执行',
+      message: `确认执行“${feature.title}”吗？高风险系统操作会立即生效。`,
+      confirmText: feature.control.buttonText || '执行',
+      tone: feature.control.tone === 'danger' ? 'danger' : 'warning',
+    })
     if (!confirmed) {
       return
     }

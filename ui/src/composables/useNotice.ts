@@ -1,4 +1,7 @@
-export type NoticeTone = 'success' | 'warning'
+import { toast } from './useToast'
+import type { ToastTone } from './useToast'
+
+export type NoticeTone = Extract<ToastTone, 'success' | 'warning' | 'info' | 'error'>
 
 export interface AppNoticePayload {
   title?: string
@@ -9,6 +12,12 @@ export interface AppNoticePayload {
 const APP_NOTICE_EVENT = 'cobweb_app_notice'
 
 export function showAppNotice(payload: AppNoticePayload) {
+  toast({
+    title: payload.title,
+    message: payload.message,
+    tone: payload.tone ?? 'success',
+  })
+
   window.dispatchEvent(
     new CustomEvent<AppNoticePayload>(APP_NOTICE_EVENT, {
       detail: payload,

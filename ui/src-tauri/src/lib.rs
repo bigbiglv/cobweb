@@ -331,7 +331,8 @@ fn get_audio_output_devices() -> Result<Vec<AudioOutputDevice>, String> {
 
 #[tauri::command]
 fn set_default_audio_output_device(device_id: String) -> Result<Vec<AudioOutputDevice>, String> {
-    cobweb_control::audio::set_default_output_device(&device_id).map_err(|error| error.to_string())?;
+    cobweb_control::audio::set_default_output_device(&device_id)
+        .map_err(|error| error.to_string())?;
     cobweb_control::audio::list_output_devices().map_err(|error| error.to_string())
 }
 
@@ -392,6 +393,34 @@ fn copy_clipboard_sync_message(message_id: String) -> Result<(), String> {
         .find(|message| message.message_id == message_id)
         .ok_or_else(|| "消息不存在".to_string())?;
     clipboard_sync::write_message_to_clipboard(&message)
+}
+
+#[tauri::command]
+fn copy_clipboard_sync_text(message_id: String) -> Result<(), String> {
+    let message = clipboard_sync::list_messages()?
+        .into_iter()
+        .find(|message| message.message_id == message_id)
+        .ok_or_else(|| "消息不存在".to_string())?;
+    let text = message
+        .text
+        .as_deref()
+        .filter(|text| !text.trim().is_empty())
+        .ok_or_else(|| "这条记录没有文本".to_string())?;
+
+    clipboard_sync::write_text_to_clipboard(text)
+}
+
+#[tauri::command]
+fn copy_clipboard_sync_attachments(
+    message_id: String,
+    attachment_ids: Vec<String>,
+) -> Result<(), String> {
+    let message = clipboard_sync::list_messages()?
+        .into_iter()
+        .find(|message| message.message_id == message_id)
+        .ok_or_else(|| "消息不存在".to_string())?;
+
+    clipboard_sync::write_attachments_to_clipboard(&message, &attachment_ids)
 }
 
 #[tauri::command]
@@ -707,6 +736,8 @@ pub fn run() {
             set_audio_app_route,
             get_clipboard_sync_messages,
             copy_clipboard_sync_message,
+            copy_clipboard_sync_text,
+            copy_clipboard_sync_attachments,
             delete_clipboard_sync_message,
             clear_clipboard_sync_messages,
             remove_paired_client,

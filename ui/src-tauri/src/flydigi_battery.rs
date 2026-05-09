@@ -72,9 +72,10 @@ pub fn attach_battery_info(devices: &mut [PeripheralDevice]) {
         return;
     };
 
-    for device in devices.iter_mut().filter(|device| {
-        is_flydigi_controller(device) && device.battery_percentage.is_none()
-    }) {
+    for device in devices
+        .iter_mut()
+        .filter(|device| is_flydigi_controller(device) && device.battery_percentage.is_none())
+    {
         if device.battery_status.is_none() {
             device.battery_status = battery.status.clone();
         }
@@ -87,19 +88,15 @@ fn query_xinput_battery() -> Option<BatteryInfo> {
 
     for user_index in 0..4 {
         let mut state = XInputState::default();
-        let connected =
-            unsafe { (library.get_state)(user_index, &mut state) == ERROR_SUCCESS };
+        let connected = unsafe { (library.get_state)(user_index, &mut state) == ERROR_SUCCESS };
         if !connected {
             continue;
         }
 
         let mut battery = XInputBatteryInformation::default();
         let ok = unsafe {
-            (library.get_battery_information)(
-                user_index,
-                BATTERY_DEVTYPE_GAMEPAD,
-                &mut battery,
-            ) == ERROR_SUCCESS
+            (library.get_battery_information)(user_index, BATTERY_DEVTYPE_GAMEPAD, &mut battery)
+                == ERROR_SUCCESS
         };
         if !ok {
             continue;
@@ -151,7 +148,10 @@ fn query_flydigi_hid_battery() -> Option<BatteryInfo> {
 }
 
 fn battery_info_from_xinput(battery_type: u8, battery_level: u8) -> Option<BatteryInfo> {
-    if matches!(battery_type, BATTERY_TYPE_DISCONNECTED | BATTERY_TYPE_UNKNOWN) {
+    if matches!(
+        battery_type,
+        BATTERY_TYPE_DISCONNECTED | BATTERY_TYPE_UNKNOWN
+    ) {
         return None;
     }
 
@@ -277,9 +277,8 @@ impl XInputLibrary {
             }
 
             let get_state = unsafe { GetProcAddress(module, b"XInputGetState\0".as_ptr().cast()) };
-            let get_battery_information = unsafe {
-                GetProcAddress(module, b"XInputGetBatteryInformation\0".as_ptr().cast())
-            };
+            let get_battery_information =
+                unsafe { GetProcAddress(module, b"XInputGetBatteryInformation\0".as_ptr().cast()) };
 
             if get_state.is_null() || get_battery_information.is_null() {
                 unsafe {
@@ -291,9 +290,7 @@ impl XInputLibrary {
             return Some(Self {
                 module,
                 get_state: unsafe { std::mem::transmute(get_state) },
-                get_battery_information: unsafe {
-                    std::mem::transmute(get_battery_information)
-                },
+                get_battery_information: unsafe { std::mem::transmute(get_battery_information) },
             });
         }
 

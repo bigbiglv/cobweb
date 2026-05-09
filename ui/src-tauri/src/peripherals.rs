@@ -297,7 +297,9 @@ fn is_logitech_auxiliary_keyboard(device: &PeripheralDevice, mouse_products: &[S
     let product = product_key(device);
     product == "VID_046D&PID_C232"
         || product == "VID_046D&PID_C547"
-        || mouse_products.iter().any(|mouse_product| mouse_product == &product)
+        || mouse_products
+            .iter()
+            .any(|mouse_product| mouse_product == &product)
 }
 
 fn is_rk_device(device: &PeripheralDevice) -> bool {
@@ -346,7 +348,11 @@ fn is_xbox_360_hid_game_controller(device: &PeripheralDevice) -> bool {
 }
 
 fn product_key(device: &PeripheralDevice) -> String {
-    let id = device.id.as_deref().unwrap_or_default().to_ascii_uppercase();
+    let id = device
+        .id
+        .as_deref()
+        .unwrap_or_default()
+        .to_ascii_uppercase();
     let vid = id
         .find("VID_")
         .and_then(|index| id.get(index..index + 8))

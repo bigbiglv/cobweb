@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -115,7 +116,9 @@ fn sanitize_file_name(file_name: &str) -> String {
     let cleaned = file_name
         .trim()
         .chars()
-        .filter(|ch| !ch.is_control() && !matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*'))
+        .filter(|ch| {
+            !ch.is_control() && !matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+        })
         .take(120)
         .collect::<String>();
 
@@ -240,7 +243,10 @@ pub fn clear_messages() -> Result<(), String> {
     fs::create_dir_all(dir).map_err(|error| error.to_string())
 }
 
-pub fn attachment_path(message_id: &str, attachment_id: &str) -> Result<(PathBuf, ClipboardSyncAttachment), String> {
+pub fn attachment_path(
+    message_id: &str,
+    attachment_id: &str,
+) -> Result<(PathBuf, ClipboardSyncAttachment), String> {
     if !is_safe_id(attachment_id) {
         return Err("附件 ID 不合法".into());
     }
@@ -259,10 +265,43 @@ pub fn write_message_to_clipboard(message: &ClipboardSyncMessage) -> Result<(), 
     let paths = message
         .attachments
         .iter()
-        .map(|attachment| message_dir(&message.message_id).map(|dir| dir.join(&attachment.stored_name)))
+        .map(|attachment| {
+            message_dir(&message.message_id).map(|dir| dir.join(&attachment.stored_name))
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     write_clipboard(message.text.as_deref(), &paths)
+}
+
+pub fn write_text_to_clipboard(text: &str) -> Result<(), String> {
+    write_clipboard(Some(text), &[])
+}
+
+pub fn write_attachments_to_clipboard(
+    message: &ClipboardSyncMessage,
+    attachment_ids: &[String],
+) -> Result<(), String> {
+    if attachment_ids.is_empty() {
+        return Err("请选择要复制的图片".into());
+    }
+
+    let selected_ids = attachment_ids
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
+    let dir = message_dir(&message.message_id)?;
+    let paths = message
+        .attachments
+        .iter()
+        .filter(|attachment| selected_ids.contains(attachment.attachment_id.as_str()))
+        .map(|attachment| dir.join(&attachment.stored_name))
+        .collect::<Vec<_>>();
+
+    if paths.len() != selected_ids.len() {
+        return Err("部分附件不存在".into());
+    }
+
+    write_clipboard(None, &paths)
 }
 
 #[cfg(target_os = "windows")]
@@ -330,8 +369,16 @@ fn write_clipboard(text: Option<&str>, files: &[PathBuf]) -> Result<(), String> 
             fNC: 0,
             fWide: 1,
         };
-        ptr::copy_nonoverlapping(&drop_files as *const DROPFILES as *const u8, lock, header_size);
-        ptr::copy_nonoverlapping(file_list.as_ptr() as *const u8, lock.add(header_size), files_size);
+        ptr::copy_nonoverlapping(
+            &drop_files as *const DROPFILES as *const u8,
+            lock,
+            header_size,
+        );
+        ptr::copy_nonoverlapping(
+            file_list.as_ptr() as *const u8,
+            lock.add(header_size),
+            files_size,
+        );
         GlobalUnlock(handle);
 
         if SetClipboardData(CF_HDROP.into(), handle).is_null() {

@@ -6,6 +6,7 @@ import { listen } from '@tauri-apps/api/event'
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { Badge } from '../../components/ui/badge/index'
 import { Button } from '../../components/ui/button/index'
+import { confirmDialog } from '../../composables/useConfirm'
 import {
   Card,
   CardContent,
@@ -97,7 +98,12 @@ async function toggleMdns() {
 }
 
 async function forgetDevice(client: ClientInfo) {
-  const confirmed = window.confirm(`确认移除“${client.client_name}”吗？`)
+  const confirmed = await confirmDialog({
+    title: '移除设备',
+    message: `确认移除“${client.client_name}”吗？移除后需要重新配对才能连接。`,
+    confirmText: '移除',
+    tone: 'danger',
+  })
   if (!confirmed)
     return
 

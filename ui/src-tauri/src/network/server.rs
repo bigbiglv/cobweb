@@ -8,12 +8,12 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use futures_util::{SinkExt, StreamExt};
 use cobweb_scheduler::{ScheduledTask, TaskOrigin};
 use cobweb_service::{
     get_feature_groups, get_feature_snapshot, FeatureCommand, FeatureExecutionResult, FeatureGroup,
     FeatureSnapshot,
 };
+use futures_util::{SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap as StdHashMap, HashSet};
@@ -26,7 +26,8 @@ use uuid::Uuid;
 
 use crate::{
     clipboard_sync::{
-        self, ClipboardSyncMessage, ClipboardSyncSource, ClipboardSyncSourceKind, IncomingAttachment,
+        self, ClipboardSyncMessage, ClipboardSyncSource, ClipboardSyncSourceKind,
+        IncomingAttachment,
     },
     features::execute_feature_command_with_origin,
     scheduler,
@@ -389,7 +390,11 @@ pub async fn start_server(port: u16, tauri_app: AppHandle) -> Result<u16, String
     }
 
     let Some(listener) = listener else {
-        return Err(format!("No available port found from {} to {}", port, u16::MAX));
+        return Err(format!(
+            "No available port found from {} to {}",
+            port,
+            u16::MAX
+        ));
     };
 
     {
@@ -1424,7 +1429,15 @@ async fn web_main_js(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> impl IntoRes
 
 async fn read_multipart_sync_message(
     mut multipart: Multipart,
-) -> Result<(Option<String>, Vec<IncomingAttachment>, ClipboardSyncSourceKind, Option<WebClientInfo>), String> {
+) -> Result<
+    (
+        Option<String>,
+        Vec<IncomingAttachment>,
+        ClipboardSyncSourceKind,
+        Option<WebClientInfo>,
+    ),
+    String,
+> {
     let mut text = None;
     let mut attachments = Vec::new();
     let mut source_kind = ClipboardSyncSourceKind::Web;
@@ -1517,10 +1530,11 @@ async fn web_clipboard_sync_create(
         );
     }
 
-    let (text, attachments, source_kind, client_info) = match read_multipart_sync_message(multipart).await {
-        Ok(value) => value,
-        Err(error) => return sync_error_response(StatusCode::BAD_REQUEST, error),
-    };
+    let (text, attachments, source_kind, client_info) =
+        match read_multipart_sync_message(multipart).await {
+            Ok(value) => value,
+            Err(error) => return sync_error_response(StatusCode::BAD_REQUEST, error),
+        };
     let write_clipboard = matches!(source_kind, ClipboardSyncSourceKind::Web);
     let source = clipboard_source(&addr, source_kind, client_info.as_ref());
 
