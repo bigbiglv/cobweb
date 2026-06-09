@@ -348,6 +348,9 @@ pub async fn start_server(port: u16, tauri_app: AppHandle) -> Result<u16, String
         .route("/web/", get(web_index))
         .route("/web/assets/style.css", get(web_css))
         .route("/web/assets/main.js", get(web_main_js))
+        .route("/web/manifest.json", get(web_manifest))
+        .route("/web/icon-192.png", get(web_icon_192))
+        .route("/web/icon-512.png", get(web_icon_512))
         .route("/web/ws", get(web_ws))
         .route("/web/api/state", get(web_state))
         .route("/web/api/features/execute", post(web_features_execute))
@@ -1425,6 +1428,42 @@ fn web_js_response(addr: &SocketAddr, content: &'static str) -> axum::response::
 
 async fn web_main_js(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> impl IntoResponse {
     web_js_response(&addr, web_console::MAIN_JS)
+}
+
+async fn web_manifest(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> impl IntoResponse {
+    if let Some(response) = reject_non_lan(&addr) {
+        return response.into_response();
+    }
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        "application/manifest+json; charset=utf-8".parse().unwrap(),
+    );
+    headers.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
+    (headers, web_console::MANIFEST_JSON).into_response()
+}
+
+fn web_png_response(addr: &SocketAddr, content: &'static [u8]) -> axum::response::Response {
+    if let Some(response) = reject_non_lan(addr) {
+        return response.into_response();
+    }
+
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        "image/png".parse().unwrap(),
+    );
+    headers.insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
+    (headers, content).into_response()
+}
+
+async fn web_icon_192(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> impl IntoResponse {
+    web_png_response(&addr, web_console::ICON_192)
+}
+
+async fn web_icon_512(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> impl IntoResponse {
+    web_png_response(&addr, web_console::ICON_512)
 }
 
 async fn read_multipart_sync_message(
