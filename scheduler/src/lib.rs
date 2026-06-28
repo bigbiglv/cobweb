@@ -88,8 +88,6 @@ pub fn describe_command(command: &FeatureCommand) -> String {
     match command {
         FeatureCommand::Shutdown => "定时关机".into(),
         FeatureCommand::Restart => "定时重启".into(),
-        FeatureCommand::TestNotification => "定时测试提示".into(),
-        FeatureCommand::ErrorTest => "定时错误测试提示".into(),
         FeatureCommand::Volume { level } => format!("定时音量调整到 {level}%"),
         FeatureCommand::AppleMusicOpen => "定时打开 Apple Music".into(),
         FeatureCommand::AppleMusicPrevious => "定时 Apple Music 上一曲".into(),

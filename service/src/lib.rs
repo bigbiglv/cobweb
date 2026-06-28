@@ -92,8 +92,6 @@ pub struct AppleMusicTrackSnapshot {
 pub enum FeatureCommand {
     Shutdown,
     Restart,
-    TestNotification,
-    ErrorTest,
     Volume { level: u8 },
     AppleMusicOpen,
     AppleMusicPrevious,
@@ -263,30 +261,6 @@ pub fn get_feature_groups() -> Vec<FeatureGroup> {
                         confirm_required: true,
                     },
                 },
-                FeatureDefinition {
-                    feature_key: "test_notification".into(),
-                    title: "测试".into(),
-                    description: "".into(),
-                    mobile_ready: true,
-                    // Note 11: 测试提示不调用系统危险能力，只验证通知链路是否正常。
-                    control: FeatureControl::Action {
-                        button_text: "测试".into(),
-                        tone: FeatureTone::Primary,
-                        confirm_required: false,
-                    },
-                },
-                FeatureDefinition {
-                    feature_key: "error_test".into(),
-                    title: "错误测试".into(),
-                    description: "".into(),
-                    mobile_ready: true,
-                    // Note 12: 错误测试故意返回失败，用来检查前端错误提示和历史记录是否正确。
-                    control: FeatureControl::Action {
-                        button_text: "测试".into(),
-                        tone: FeatureTone::Primary,
-                        confirm_required: false,
-                    },
-                },
             ],
         },
         FeatureGroup {
@@ -361,19 +335,6 @@ pub fn execute_feature_command(
             // 业务层不用关心 Windows 命令细节，只负责返回统一结果。
             system::restart()?;
             Ok(feature_result("restart", "重启指令已发送", None))
-        }
-        FeatureCommand::TestNotification => {
-            // Note 18: 测试提示不调用操作系统接口，它直接返回成功结果。
-            // Tauri 入口层会根据这个命令生成 feature_notice 事件，让前端展示提示。
-            Ok(feature_result("test_notification", "测试提示已触发", None))
-        }
-        FeatureCommand::ErrorTest => {
-            // Note 19: 这里故意 sleep 3 秒再返回 Err，用于模拟后端慢请求失败。
-            // 这能测试前端 loading、错误提示和任务历史失败记录。
-            std::thread::sleep(std::time::Duration::from_secs(3));
-            Err(FeatureServiceError::new(
-                "错误测试提示：PC 端执行 3 秒后返回测试错误",
-            ))
         }
         FeatureCommand::Volume { level } => {
             // Note 20: Volume { level } 是带数据的枚举变体。
@@ -494,8 +455,6 @@ mod tests {
 
         assert!(feature_keys.contains(&"shutdown"));
         assert!(feature_keys.contains(&"restart"));
-        assert!(feature_keys.contains(&"test_notification"));
-        assert!(feature_keys.contains(&"error_test"));
         assert!(feature_keys.contains(&"volume"));
         assert!(
             feature_keys.contains(&"apple_music_open")

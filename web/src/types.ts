@@ -58,6 +58,19 @@ export interface AppleMusicTrackInfo {
   durationMs: number | null;
 }
 
+export interface AudioOutputDevice {
+  id: string;
+  name: string;
+  volume: number;
+  muted: boolean;
+  isDefault: boolean;
+}
+
+export interface WebAudioDevicesResponse {
+  success: boolean;
+  msg: string;
+  devices: AudioOutputDevice[];
+}
 export type FeatureCommand =
   | { feature: "shutdown" | "restart" | "test_notification" | "error_test" | string }
   | { feature: "volume"; level: number };

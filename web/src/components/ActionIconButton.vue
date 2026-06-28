@@ -12,6 +12,7 @@ const {
   disabled = false,
   floating = false,
   decorative = false,
+  iconSize = "1rem",
 } = defineProps<{
   icon: ButtonIconName;
   label: string;
@@ -21,6 +22,7 @@ const {
   disabled?: boolean;
   floating?: boolean;
   decorative?: boolean;
+  iconSize?: string;
 }>();
 
 defineEmits<{
@@ -47,7 +49,7 @@ const activeIndex = computed(() => {
     :class="[`operation-button-${tone}`, `is-${state}`, { 'is-floating': floating }]"
     aria-hidden="true"
   >
-    <MorphIcon class="button-icon" :paths="iconPaths" :active-index="activeIndex" size="1rem" />
+    <MorphIcon class="button-icon" :paths="iconPaths" :active-index="activeIndex" :size="iconSize" />
   </span>
   <button
     v-else
@@ -58,6 +60,6 @@ const activeIndex = computed(() => {
     :disabled="disabled"
     @click="$emit('click', $event)"
   >
-    <MorphIcon class="button-icon" :paths="iconPaths" :active-index="activeIndex" size="1rem" />
+    <MorphIcon class="button-icon" :paths="iconPaths" :active-index="activeIndex" :size="iconSize" />
   </button>
 </template>

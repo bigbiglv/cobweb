@@ -78,6 +78,7 @@ function actionState(action: MediaPlayerAction) {
         :label="actionState(action) === 'running' ? '停止' : labelForMediaAction(action, snapshot?.appleMusicPlaybackState, snapshot?.appleMusicTrack)"
         :state="actionState(action)"
         :disabled="actionState(action) === 'running'"
+        icon-size="1.5rem"
         @click="$emit('runAction', feature, action)"
       />
     </div>

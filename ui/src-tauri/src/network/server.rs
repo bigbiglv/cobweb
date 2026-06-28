@@ -288,6 +288,21 @@ pub struct WebTaskCancelRequest {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct WebAudioDevicesResponse {
+    pub success: bool,
+    pub msg: String,
+    pub devices: Vec<cobweb_control::audio::AudioOutputDevice>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WebAudioDeviceVolumeRequest {
+    pub device_id: String,
+    pub level: u8,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WebStateResponse {
     pub success: bool,
     pub msg: String,
@@ -362,6 +377,8 @@ pub async fn start_server(port: u16, tauri_app: AppHandle) -> Result<u16, String
             "/web/api/sync/files/:message_id/:attachment_id",
             get(web_clipboard_sync_file),
         )
+        .route("/web/api/audio/devices", get(web_audio_devices))
+        .route("/web/api/audio/devices/volume", post(web_audio_device_volume))
         .layer(DefaultBodyLimit::max(200 * 1024 * 1024))
         .layer(cors);
 
@@ -1748,6 +1765,63 @@ async fn web_tasks_cancel(
             success: false,
             msg: "未找到可停止的定时任务".into(),
             task: None,
+        }),
+    }
+}
+
+async fn web_audio_devices(ConnectInfo(addr): ConnectInfo<SocketAddr>) -> Json<WebAudioDevicesResponse> {
+    if !is_lan_or_loopback(&addr) {
+        return Json(WebAudioDevicesResponse {
+            success: false,
+            msg: "Web console is only available on the local network".into(),
+            devices: vec![],
+        });
+    }
+
+    match cobweb_control::audio::list_output_devices() {
+        Ok(devices) => Json(WebAudioDevicesResponse {
+            success: true,
+            msg: "OK".into(),
+            devices,
+        }),
+        Err(error) => Json(WebAudioDevicesResponse {
+            success: false,
+            msg: error.to_string(),
+            devices: vec![],
+        }),
+    }
+}
+
+async fn web_audio_device_volume(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(payload): Json<WebAudioDeviceVolumeRequest>,
+) -> Json<WebAudioDevicesResponse> {
+    if !is_lan_or_loopback(&addr) {
+        return Json(WebAudioDevicesResponse {
+            success: false,
+            msg: "Web console is only available on the local network".into(),
+            devices: vec![],
+        });
+    }
+
+    if let Err(error) = cobweb_control::audio::set_output_device_volume(&payload.device_id, payload.level) {
+        return Json(WebAudioDevicesResponse {
+            success: false,
+            msg: error.to_string(),
+            devices: vec![],
+        });
+    }
+
+    match cobweb_control::audio::list_output_devices() {
+        Ok(devices) => Json(WebAudioDevicesResponse {
+            success: true,
+            msg: "音量已调整".into(),
+            devices,
+        }),
+        Err(error) => Json(WebAudioDevicesResponse {
+            success: false,
+            msg: error.to_string(),
+            devices: vec![],
         }),
     }
 }

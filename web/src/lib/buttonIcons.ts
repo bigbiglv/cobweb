@@ -1,5 +1,6 @@
 export type ButtonIconName =
   | "alert"
+  | "arrowLeft"
   | "bell"
   | "check"
   | "clock"
@@ -22,6 +23,7 @@ export type ButtonIconName =
 // 单 path 图标用于 MorphSVG 统一执行前、执行中、执行完成的变形动画。
 const iconPaths: Record<ButtonIconName, string> = {
   alert: "M12 3L22 20H2L12 3ZM11 8V13H13V8H11ZM11 16V18H13V16H11Z",
+  arrowLeft: "M20 11H7.83L13.42 5.41L12 4L4 12L12 20L13.41 18.59L7.83 13H20V11Z",
   bell: "M12 22A3 3 0 0 0 15 19H9A3 3 0 0 0 12 22ZM5 17H19L17 15V10A5 5 0 0 0 13 5.1V3H11V5.1A5 5 0 0 0 7 10V15L5 17Z",
   check: "M9.2 16.6L4.9 12.3L3.5 13.7L9.2 19.4L21 7.6L19.6 6.2L9.2 16.6Z",
   clock: "M12 2A10 10 0 1 0 12 22A10 10 0 0 0 12 2ZM13 7H11V13L16 16L17 14.3L13 12V7Z",

@@ -424,10 +424,15 @@ p {
   gap: 14px;
 }
 
+.tile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .control-card {
   min-height: 132px;
   padding: 18px;
   border-radius: 1.75rem;
+  color: var(--foreground);
 }
 
 .action-card {
@@ -476,6 +481,72 @@ p {
   font-weight: 850;
 }
 
+.action-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  border: 1px solid var(--app-nav-border);
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+  cursor: pointer;
+}
+
+.action-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.1);
+  background: color-mix(in oklab, var(--card) 96%, transparent);
+}
+
+.action-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+}
+
+.action-tile.is-running {
+  background: color-mix(in oklab, var(--app-warning) 12%, transparent);
+  border-color: color-mix(in oklab, var(--app-warning) 30%, transparent);
+}
+
+.action-tile-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: var(--primary);
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+.action-tile-icon.danger {
+  color: var(--app-danger);
+  background: color-mix(in oklab, var(--app-danger) 12%, transparent);
+}
+
+.action-tile-icon .operation-button {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+}
+
+.action-tile-title {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.nav-tiles {
+  margin-top: 14px;
+}
+
+.home-page .media-card {
+  margin-bottom: 14px;
+}
+
 .volume-card {
   margin-top: 14px;
 }
@@ -501,9 +572,17 @@ p {
 }
 
 .media-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+}
+
+.media-actions .operation-button {
+  min-height: 56px;
+  width: 56px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 .media-progress {
@@ -965,7 +1044,7 @@ textarea:focus {
   }
 
   .action-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .composer-panel {

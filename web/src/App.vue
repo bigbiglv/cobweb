@@ -5,6 +5,7 @@ import AppConfirmDialog from "./components/AppConfirmDialog.vue";
 import AppToast from "./components/AppToast.vue";
 import FeatureActionCard from "./components/FeatureActionCard.vue";
 import MediaPlayerCard from "./components/MediaPlayerCard.vue";
+import AudioDeviceModal from "./components/AudioDeviceModal.vue";
 import { useConfirmDialog } from "./composables/useConfirmDialog";
 import { useWebConsole } from "./useWebConsole";
 import type { FeatureDefinition, MediaPlayerAction } from "./types";
@@ -60,6 +61,7 @@ const mediaRefreshState = ref<"idle" | "running" | "done">("idle");
 const volumeRefreshState = ref<"idle" | "running" | "done">("idle");
 const syncText = ref("");
 const syncFiles = ref<File[]>([]);
+const showAudioModal = ref(false);
 let mediaRefreshDoneTimer = 0;
 let volumeRefreshDoneTimer = 0;
 
@@ -169,25 +171,23 @@ function syncSourceName(message: {
   <div class="app-shell">
     <!-- <header class="topbar"> 暂时隐藏顶栏，后续需要连接状态或主题切换时再恢复。 -->
 
-    <nav class="section-nav" aria-label="控制台导航">
-      <div class="section-nav-inner">
-        <button
-          v-for="item in navItems"
-          :key="item.key"
-          class="nav-item"
-          :class="{ active: activeTab === item.key }"
-          type="button"
-          @click="activeTab = item.key"
-        >
-          <ActionIconButton :icon="item.icon" :label="item.label" decorative />
-          {{ item.label }}
-        </button>
-      </div>
-    </nav>
+
 
     <main class="workspace">
-      <section v-show="activeTab === 'actions'" class="page">
-        <div v-if="actionFeatures.length || mediaPlayerFeatures.length" class="action-grid">
+      <section v-show="activeTab === 'actions'" class="page home-page">
+        <MediaPlayerCard
+          v-for="feature in mediaPlayerFeatures"
+          :key="feature.featureKey"
+          :feature="feature"
+          :snapshot="snapshot"
+          :pending-key="activeFeatureKey"
+          :completed-key="completedFeatureKey"
+          :refresh-state="mediaRefreshState"
+          @refresh="refreshMediaCard"
+          @run-action="runMediaAction"
+        />
+
+        <div v-if="actionFeatures.length" class="action-grid tile-grid">
           <FeatureActionCard
             v-for="feature in actionFeatures"
             :key="feature.featureKey"
@@ -195,53 +195,40 @@ function syncSourceName(message: {
             :action-state="actionState(feature.featureKey)"
             @run="runFeature"
           />
-
-          <MediaPlayerCard
-            v-for="feature in mediaPlayerFeatures"
-            :key="feature.featureKey"
-            :feature="feature"
-            :snapshot="snapshot"
-            :pending-key="activeFeatureKey"
-            :completed-key="completedFeatureKey"
-            :refresh-state="mediaRefreshState"
-            @refresh="refreshMediaCard"
-            @run-action="runMediaAction"
-          />
         </div>
-        <div v-else class="empty-state">暂无功能</div>
 
-        <article v-for="feature in rangeFeatures" :key="feature.featureKey" class="control-card volume-card">
-          <div class="volume-head">
-            <div class="action-card-main">
-              <div class="feature-icon">
-                <ActionIconButton icon="volume" :label="feature.title" decorative />
-              </div>
-              <div class="feature-title">{{ feature.title }}</div>
-            </div>
-            <div class="volume-tools">
-              <div class="volume-value">{{ snapshot?.volumeLevel ?? taskVolume }}{{ feature.control.type === "range" ? feature.control.unit : "%" }}</div>
-              <ActionIconButton
-                icon="refresh"
-                label="刷新音量"
-                :state="volumeRefreshState"
-                floating
-                @click="refreshVolumeCard"
-              />
-            </div>
-          </div>
-          <input
-            v-if="feature.control.type === 'range'"
-            v-model.number="taskVolume"
-            type="range"
-            :min="feature.control.min"
-            :max="feature.control.max"
-            :step="feature.control.step"
-            @change="runFeature(feature, taskVolume)"
-          >
-        </article>
+        <div class="action-grid tile-grid nav-tiles">
+          <button class="control-card action-tile" @click="activeTab = 'schedules'">
+            <div class="action-tile-icon"><ActionIconButton icon="clock" label="定时" decorative tone="primary" /></div>
+            <div class="action-tile-title">定时</div>
+          </button>
+          <button class="control-card action-tile" @click="activeTab = 'sync'">
+            <div class="action-tile-icon"><ActionIconButton icon="upload" label="同步" decorative tone="primary" /></div>
+            <div class="action-tile-title">同步</div>
+          </button>
+          <button class="control-card action-tile" @click="activeTab = 'history'">
+            <div class="action-tile-icon"><ActionIconButton icon="history" label="历史" decorative tone="primary" /></div>
+            <div class="action-tile-title">历史</div>
+          </button>
+          <button class="control-card action-tile" @click="showAudioModal = true">
+            <div class="action-tile-icon"><ActionIconButton icon="volume" label="音量" decorative tone="primary" /></div>
+            <div class="action-tile-title">音量</div>
+          </button>
+        </div>
+        
+        <AudioDeviceModal
+          :open="showAudioModal"
+          @close="showAudioModal = false"
+        />
       </section>
 
       <section v-show="activeTab === 'schedules'" class="page">
+        <div class="section-title compact">
+          <ActionIconButton icon="arrowLeft" label="返回" @click="activeTab = 'actions'" />
+          <h2>定时</h2>
+          <div class="nav-action" style="width: 42px"></div>
+        </div>
+
         <form class="composer-panel" @submit.prevent="submitTask">
           <label>
             <span>任务</span>
@@ -294,6 +281,12 @@ function syncSourceName(message: {
       </section>
 
       <section v-show="activeTab === 'sync'" class="page">
+        <div class="section-title compact">
+          <ActionIconButton icon="arrowLeft" label="返回" @click="activeTab = 'actions'" />
+          <h2>同步</h2>
+          <div class="nav-action" style="width: 42px"></div>
+        </div>
+
         <form class="composer-panel sync-composer" @submit.prevent="submitSync">
           <label class="sync-text-field">
             <span>文本</span>
@@ -351,6 +344,12 @@ function syncSourceName(message: {
       </section>
 
       <section v-show="activeTab === 'history'" class="page">
+        <div class="section-title compact">
+          <ActionIconButton icon="arrowLeft" label="返回" @click="activeTab = 'actions'" />
+          <h2>历史</h2>
+          <div class="nav-action" style="width: 42px"></div>
+        </div>
+
         <div v-if="visibleHistory.length" class="list-stack">
           <article v-for="entry in visibleHistory" :key="`${entry.taskId ?? 'manual'}-${entry.recordedAtMs}`" class="list-row">
             <span class="status-badge" :class="entry.status">

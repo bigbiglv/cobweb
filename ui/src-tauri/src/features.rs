@@ -124,8 +124,6 @@ fn describe_command_title(command: &FeatureCommand) -> String {
     match command {
         FeatureCommand::Shutdown => "关机".into(),
         FeatureCommand::Restart => "重启".into(),
-        FeatureCommand::TestNotification => "测试提示".into(),
-        FeatureCommand::ErrorTest => "错误测试提示".into(),
         FeatureCommand::Volume { level } => format!("设置音量 {level}%"),
         FeatureCommand::AppleMusicOpen => "打开 Apple Music".into(),
         FeatureCommand::AppleMusicPrevious => "Apple Music 上一曲".into(),
@@ -136,16 +134,11 @@ fn describe_command_title(command: &FeatureCommand) -> String {
 
 fn build_notice_payload(
     command: &FeatureCommand,
-    result: &FeatureExecutionResult,
+    _result: &FeatureExecutionResult,
 ) -> Option<FeatureNoticePayload> {
-    // Note 10: 不是每个功能都需要弹出桌面提示。当前只给“测试提示”返回 Some，
+    // Note 10: 不是每个功能都需要弹出桌面提示。
     // 其他功能返回 None，表示执行成功但不额外弹提示。
     match command {
-        FeatureCommand::TestNotification => Some(FeatureNoticePayload {
-            title: "测试提示".into(),
-            message: result.message.clone(),
-            tone: "success".into(),
-        }),
         _ => None,
     }
 }

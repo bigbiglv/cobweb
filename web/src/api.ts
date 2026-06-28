@@ -5,6 +5,7 @@ import type {
   TaskCreateResponse,
   WebClientInfo,
   WebStateResponse,
+  WebAudioDevicesResponse,
 } from "./types";
 
 interface NavigatorUAData {
@@ -130,6 +131,25 @@ export async function executeCommand(command: FeatureCommand) {
     method: "POST",
     body: JSON.stringify({ client_info: await getWebClientInfo(), ...command }),
   });
+}
+
+export async function getAudioDevices() {
+  const payload = await requestJson<WebAudioDevicesResponse>("/web/api/audio/devices");
+  if (!payload.success) {
+    throw new Error(payload.msg || "获取设备列表失败");
+  }
+  return payload.devices;
+}
+
+export async function setAudioDeviceVolume(deviceId: string, level: number) {
+  const payload = await requestJson<WebAudioDevicesResponse>("/web/api/audio/devices/volume", {
+    method: "POST",
+    body: JSON.stringify({ deviceId, level }),
+  });
+  if (!payload.success) {
+    throw new Error(payload.msg || "设置音量失败");
+  }
+  return payload.devices;
 }
 
 export async function createScheduledTask(command: FeatureCommand, delayMs: number) {
