@@ -174,7 +174,7 @@ function syncSourceName(message: {
 
 
     <main class="workspace">
-      <section v-show="activeTab === 'actions'" class="page home-page">
+      <section v-if="activeTab === 'actions'" class="page home-page">
         <MediaPlayerCard
           v-for="feature in mediaPlayerFeatures"
           :key="feature.featureKey"
@@ -222,7 +222,7 @@ function syncSourceName(message: {
         />
       </section>
 
-      <section v-show="activeTab === 'schedules'" class="page">
+      <section v-if="activeTab === 'schedules'" class="page">
         <div class="section-title compact">
           <ActionIconButton icon="arrowLeft" label="返回" @click="activeTab = 'actions'" />
           <h2>定时</h2>
@@ -280,7 +280,7 @@ function syncSourceName(message: {
         <div v-else class="empty-state">暂无任务</div>
       </section>
 
-      <section v-show="activeTab === 'sync'" class="page">
+      <section v-if="activeTab === 'sync'" class="page">
         <div class="section-title compact">
           <ActionIconButton icon="arrowLeft" label="返回" @click="activeTab = 'actions'" />
           <h2>同步</h2>
@@ -343,7 +343,7 @@ function syncSourceName(message: {
         <div v-else class="empty-state">暂无同步记录</div>
       </section>
 
-      <section v-show="activeTab === 'history'" class="page">
+      <section v-if="activeTab === 'history'" class="page">
         <div class="section-title compact">
           <ActionIconButton icon="arrowLeft" label="返回" @click="activeTab = 'actions'" />
           <h2>历史</h2>
@@ -381,3 +381,246 @@ function syncSourceName(message: {
     />
   </div>
 </template>
+
+<style scoped>
+.home-page .media-card {
+  margin-bottom: 14px;
+}
+
+.schedule-list {
+  margin-top: 16px;
+}
+
+.sync-composer {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.54fr) 96px;
+  align-items: stretch;
+}
+
+.sync-text-field {
+  min-width: 0;
+}
+
+.sync-selected-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.sync-selected-files span {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  border: 1px solid var(--app-nav-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-list {
+  margin-top: 16px;
+}
+
+.sync-message {
+  align-items: flex-start;
+}
+
+.sync-message-text {
+  max-width: 100%;
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.sync-attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sync-attachment {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--app-nav-border);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--card) 82%, transparent);
+}
+
+.sync-attachment:hover {
+  border-color: color-mix(in oklab, var(--primary) 42%, var(--app-nav-border));
+}
+
+.sync-attachment img {
+  width: 100%;
+  aspect-ratio: 1.35;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  background: var(--muted);
+}
+
+.sync-attachment span,
+.sync-attachment small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-attachment span {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.sync-attachment small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+
+<style scoped>
+.home-page .media-card {
+  margin-bottom: 14px;
+}
+
+.schedule-list {
+  margin-top: 16px;
+}
+
+.sync-composer {
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.54fr) 96px;
+  align-items: stretch;
+}
+
+.sync-text-field {
+  min-width: 0;
+}
+
+.sync-selected-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.sync-selected-files span {
+  display: inline-flex;
+  max-width: 100%;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  border: 1px solid var(--app-nav-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-list {
+  margin-top: 16px;
+}
+
+.sync-message {
+  align-items: flex-start;
+}
+
+.sync-message-text {
+  max-width: 100%;
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.sync-attachments {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.sync-attachment {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  color: inherit;
+  text-decoration: none;
+  border: 1px solid var(--app-nav-border);
+  border-radius: 1rem;
+  background: color-mix(in oklab, var(--card) 82%, transparent);
+}
+
+.sync-attachment:hover {
+  border-color: color-mix(in oklab, var(--primary) 42%, var(--app-nav-border));
+}
+
+.sync-attachment img {
+  width: 100%;
+  aspect-ratio: 1.35;
+  object-fit: cover;
+  border-radius: 0.75rem;
+  background: var(--muted);
+}
+
+.sync-attachment span,
+.sync-attachment small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-attachment span {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.sync-attachment small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.nav-tiles {
+  margin-top: 14px;
+}
+
+.action-grid,
+.tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 860px) {
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .composer-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1120px) {
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

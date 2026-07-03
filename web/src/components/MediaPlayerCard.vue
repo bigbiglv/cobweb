@@ -84,3 +84,108 @@ function actionState(action: MediaPlayerAction) {
     </div>
   </article>
 </template>
+
+<style scoped>
+.media-card {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding: 18px;
+  border-radius: 1.75rem;
+  border: 1px solid var(--border);
+  background: var(--skeuo-grad);
+  box-shadow: var(--skeuo-shadow);
+}
+
+.media-artwork {
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+.media-artwork img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-title-block {
+  min-width: 0;
+}
+
+.media-actions {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 24px;
+}
+
+.media-actions :deep(.operation-button) {
+  min-height: 56px;
+  width: 56px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.media-progress {
+  display: grid;
+  gap: 7px;
+}
+
+.media-progress-track {
+  height: 6px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--muted) 40%, transparent);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+}
+
+.media-progress-value {
+  height: 100%;
+  background: var(--primary);
+  border-radius: inherit;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.media-time-row {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.volume-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.action-card-main {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 14px;
+}
+
+.feature-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  margin-bottom: 0;
+  color: var(--primary);
+  place-items: center;
+  border-radius: 999px;
+  background: var(--skeuo-grad);
+  box-shadow: var(--skeuo-shadow);
+  border: 1px solid var(--border);
+}
+
+.feature-title {
+  margin-bottom: 0;
+  font-size: 17px;
+  font-weight: 850;
+}
+</style>

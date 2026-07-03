@@ -1,0 +1,77 @@
+:root {
+  --font-sans:
+    "SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display:
+    "SF Pro Display", "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --radius: 1rem;
+  --background: oklch(0.985 0.006 286);
+  --foreground: oklch(0.23 0.014 286);
+  --card: oklch(0.998 0.002 286);
+  --muted: oklch(0.955 0.01 286);
+  --muted-foreground: oklch(0.49 0.018 286);
+  --primary: oklch(0.61 0.155 304);
+  --primary-foreground: oklch(0.985 0.006 286);
+  --secondary: oklch(0.964 0.014 294);
+  --border: oklch(0.91 0.01 286);
+  --input: oklch(0.91 0.01 286);
+  --ring: oklch(0.61 0.155 304);
+  --app-nav: color-mix(in oklab, white 82%, oklch(0.61 0.155 304) 4%);
+  --app-nav-foreground: oklch(0.23 0.014 286);
+  --app-nav-muted: oklch(0.47 0.018 286);
+  --app-nav-border: color-mix(in oklab, oklch(0.91 0.01 286) 74%, white);
+  --app-grid-line: rgba(82, 76, 96, 0.2);
+  --app-success: oklch(0.72 0.15 154);
+  --app-warning: oklch(0.79 0.14 78);
+  --app-danger: oklch(0.64 0.2 28);
+  
+  /* Skeuomorphism Variables (Light) */
+  --skeuo-grad: linear-gradient(135deg, #ffffff 0%, #f0f2f5 100%);
+  --skeuo-grad-active: linear-gradient(135deg, #f0f2f5 0%, #ffffff 100%);
+  --skeuo-shadow: 
+    6px 6px 12px rgba(0, 0, 0, 0.08), 
+    -6px -6px 12px rgba(255, 255, 255, 0.9),
+    inset 0 2px 2px rgba(255, 255, 255, 1),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.04);
+  --skeuo-shadow-active: 
+    inset 4px 4px 8px rgba(0, 0, 0, 0.08), 
+    inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+    
+  --app-shadow: 0 28px 60px rgba(15, 23, 42, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --background: oklch(0.16 0.01 286);
+  --foreground: oklch(0.95 0.005 286);
+  --card: oklch(0.21 0.014 288);
+  --muted: oklch(0.25 0.01 286);
+  --muted-foreground: oklch(0.74 0.01 286);
+  --primary: oklch(0.58 0.13 304);
+  --primary-foreground: oklch(0.19 0.02 290);
+  --secondary: oklch(0.27 0.014 292);
+  --border: oklch(0.3 0.01 286 / 0.86);
+  --input: oklch(0.3 0.01 286 / 0.86);
+  --ring: oklch(0.72 0.12 304);
+  --app-nav: rgba(11, 12, 17, 0.72);
+  --app-nav-foreground: oklch(0.95 0.005 286);
+  --app-nav-muted: oklch(0.74 0.01 286);
+  --app-nav-border: rgba(255, 255, 255, 0.08);
+  --app-grid-line: rgba(255, 255, 255, 0.18);
+  --app-success: oklch(0.75 0.13 154);
+  --app-warning: oklch(0.82 0.11 78);
+  --app-danger: oklch(0.67 0.16 28);
+  
+  /* Skeuomorphism Variables (Dark) */
+  --skeuo-grad: linear-gradient(135deg, #383c44 0%, #2a2d35 100%);
+  --skeuo-grad-active: linear-gradient(135deg, #2a2d35 0%, #383c44 100%);
+  --skeuo-shadow: 
+    6px 6px 12px rgba(0, 0, 0, 0.4), 
+    -6px -6px 12px rgba(255, 255, 255, 0.06),
+    inset 0 2px 2px rgba(255, 255, 255, 0.08),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+  --skeuo-shadow-active: 
+    inset 4px 4px 8px rgba(0, 0, 0, 0.4), 
+    inset -4px -4px 8px rgba(255, 255, 255, 0.04);
+    
+  --app-shadow: 0 28px 60px rgba(0, 0, 0, 0.34);
+}
