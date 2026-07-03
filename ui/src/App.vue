@@ -9,21 +9,37 @@ const bootLoading = ref(true)
 const routeLoading = ref(false)
 const showLoading = computed(() => bootLoading.value || routeLoading.value)
 
-let loadingTimer: number | null = null
+let startLoadingTimer: number | null = null
+let stopLoadingTimer: number | null = null
 
 const removeBeforeGuard = router.beforeEach(() => {
-  if (loadingTimer !== null) {
-    window.clearTimeout(loadingTimer)
-    loadingTimer = null
+  if (stopLoadingTimer !== null) {
+    window.clearTimeout(stopLoadingTimer)
+    stopLoadingTimer = null
   }
-  routeLoading.value = true
+  
+  if (!routeLoading.value && startLoadingTimer === null) {
+    startLoadingTimer = window.setTimeout(() => {
+      routeLoading.value = true
+      startLoadingTimer = null
+    }, 200)
+  }
 })
 
 const removeAfterGuard = router.afterEach(() => {
-  loadingTimer = window.setTimeout(() => {
+  if (startLoadingTimer !== null) {
+    window.clearTimeout(startLoadingTimer)
+    startLoadingTimer = null
+  }
+  
+  if (routeLoading.value) {
+    stopLoadingTimer = window.setTimeout(() => {
+      routeLoading.value = false
+      stopLoadingTimer = null
+    }, 420)
+  } else {
     routeLoading.value = false
-    loadingTimer = null
-  }, 420)
+  }
 })
 
 onMounted(() => {
@@ -35,8 +51,11 @@ onMounted(() => {
 onBeforeUnmount(() => {
   removeBeforeGuard()
   removeAfterGuard()
-  if (loadingTimer !== null) {
-    window.clearTimeout(loadingTimer)
+  if (startLoadingTimer !== null) {
+    window.clearTimeout(startLoadingTimer)
+  }
+  if (stopLoadingTimer !== null) {
+    window.clearTimeout(stopLoadingTimer)
   }
 })
 </script>
