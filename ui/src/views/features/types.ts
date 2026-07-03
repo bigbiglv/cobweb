@@ -78,6 +78,7 @@ export type FeatureCommand =
   | { feature: 'apple_music_previous' }
   | { feature: 'apple_music_play_pause' }
   | { feature: 'apple_music_next' }
+  | { feature: 'sunlogin_open' }
 
 export interface FeatureExecutionResult {
   featureKey: string

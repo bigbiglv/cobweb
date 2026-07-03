@@ -80,6 +80,15 @@ const router = createRouter({
             description: '管理 Windows 默认输出设备、应用输出偏好和各输出设备音量。',
           },
         },
+        {
+          path: 'peripherals',
+          name: 'Peripherals',
+          component: () => import('../views/peripherals/index.vue'),
+          meta: {
+            title: '外设',
+            description: '查看本机外设电量与状态。',
+          },
+        },
       ],
     },
   ],

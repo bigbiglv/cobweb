@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { mdiMoonWaningCrescent, mdiWeatherSunny } from '@mdi/js'
-import { ClipboardList, Clock3, Download, Headphones, House, LoaderCircle, Music2, PanelsTopLeft, Settings, Smartphone, Sparkles } from 'lucide-vue-next'
+import { ClipboardList, Clock3, Download, Headphones, House, LoaderCircle, Music2, PanelsTopLeft, Settings, Smartphone, Sparkles, Usb } from 'lucide-vue-next'
 import { computed, onMounted, onUnmounted, ref, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import MorphIcon from '../animatedIcons/mid/MorphIcon.vue'
@@ -35,6 +35,7 @@ const navigationItems = [
   { path: '/task-history', label: '任务记录', icon: PanelsTopLeft },
   { path: '/clipboard-sync', label: '同步', icon: ClipboardList },
   { path: '/connected-devices', label: '设备', icon: Smartphone },
+  { path: '/peripherals', label: '外设', icon: Usb },
   { path: '/features', label: '功能', icon: Sparkles },
   { path: '/apple-music', label: '音乐', icon: Music2 },
   { path: '/audio-routing', label: '音频', icon: Headphones },
