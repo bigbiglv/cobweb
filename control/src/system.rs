@@ -54,6 +54,63 @@ pub fn restart() -> Result<(), SystemControlError> {
     run_system_command("shutdown", ["/r", "/t", "0"])
 }
 
+pub fn open_sunlogin() -> Result<(), SystemControlError> {
+    #[cfg(target_os = "windows")]
+    {
+        let script = r#"
+$paths = @(
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
+)
+$sunlogin = Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "向日葵" -or $_.DisplayName -match "Sunlogin" } | Select-Object -First 1
+if ($sunlogin -and $sunlogin.DisplayIcon) {
+    $exe = $sunlogin.DisplayIcon.Split(',')[0].Trim('"')
+    if (Test-Path $exe) {
+        Start-Process $exe
+        exit 0
+    }
+}
+
+$shortcutPaths = @("C:\ProgramData\Microsoft\Windows\Start Menu\Programs", "$env:USERPROFILE\AppData\Roaming\Microsoft\Windows\Start Menu\Programs")
+$shortcut = Get-ChildItem -Path $shortcutPaths -Filter "*向日葵*.lnk" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($shortcut) {
+    $sh = New-Object -ComObject WScript.Shell
+    $target = $sh.CreateShortcut($shortcut.FullName).TargetPath
+    if (Test-Path $target) {
+        Start-Process $target
+        exit 0
+    }
+}
+
+exit 1
+"#;
+        let mut command = Command::new("powershell.exe");
+        command.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script]);
+        command.creation_flags(0x08000000);
+
+        let status = command.status().map_err(|error| {
+            SystemControlError::CommandFailed(format!("尝试打开向日葵远程控制失败: {error}"))
+        })?;
+
+        if status.success() {
+            Ok(())
+        } else {
+            Err(SystemControlError::CommandFailed(format!(
+                "未能在本机找到向日葵客户端，请确认是否已安装。退出码: {:?}",
+                status.code()
+            )))
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err(SystemControlError::UnsupportedPlatform(
+            "当前仅支持 Windows 桌面端控制",
+        ))
+    }
+}
+
 pub fn set_system_volume(level: u8) -> Result<u8, SystemControlError> {
     // Note 4: 即使前端滑块限制了 0 到 100，后端仍然要校验。
     // 因为 Web、移动端或调试工具都可能绕过前端直接调用这个命令。

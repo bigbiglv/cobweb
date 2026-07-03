@@ -129,6 +129,7 @@ fn describe_command_title(command: &FeatureCommand) -> String {
         FeatureCommand::AppleMusicPrevious => "Apple Music 上一曲".into(),
         FeatureCommand::AppleMusicPlayPause => "Apple Music 播放状态切换".into(),
         FeatureCommand::AppleMusicNext => "Apple Music 下一曲".into(),
+        FeatureCommand::SunloginOpen => "打开向日葵远程控制".into(),
     }
 }
 

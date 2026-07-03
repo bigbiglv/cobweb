@@ -211,6 +211,7 @@ function buildActionCommand(feature: ActionFeatureDefinition): FeatureCommand {
   if (feature.featureKey === 'test_notification') return { feature: 'test_notification' }
   if (feature.featureKey === 'error_test') return { feature: 'error_test' }
   if (feature.featureKey === 'apple_music_open') return { feature: 'apple_music_open' }
+  if (feature.featureKey === 'sunlogin_open') return { feature: 'sunlogin_open' }
 
   throw new Error(`未支持的操作：${feature.featureKey}`)
 }

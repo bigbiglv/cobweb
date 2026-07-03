@@ -97,6 +97,7 @@ pub enum FeatureCommand {
     AppleMusicPrevious,
     AppleMusicPlayPause,
     AppleMusicNext,
+    SunloginOpen,
 }
 
 // Note 6: FeatureExecutionResult 是执行命令后的统一返回值。
@@ -289,6 +290,22 @@ pub fn get_feature_groups() -> Vec<FeatureGroup> {
             description: "".into(),
             features: apple_music_features,
         },
+        FeatureGroup {
+            group_key: "tools".into(),
+            title: "常用工具".into(),
+            description: "".into(),
+            features: vec![FeatureDefinition {
+                feature_key: "sunlogin_open".into(),
+                title: "向日葵远程控制".into(),
+                description: "".into(),
+                mobile_ready: true,
+                control: FeatureControl::Action {
+                    button_text: "打开".into(),
+                    tone: FeatureTone::Primary,
+                    confirm_required: false,
+                },
+            }],
+        },
     ]
 }
 
@@ -372,6 +389,10 @@ pub fn execute_feature_command(
             // 这种写法让新增媒体命令时更容易保持统一结构。
             media::execute_apple_music_command(media::AppleMusicCommand::Next)?;
             Ok(apple_music_result("apple_music_next", "已切换到下一曲"))
+        }
+        FeatureCommand::SunloginOpen => {
+            system::open_sunlogin()?;
+            Ok(feature_result("sunlogin_open", "向日葵远程控制已尝试打开", None))
         }
     }
 }
