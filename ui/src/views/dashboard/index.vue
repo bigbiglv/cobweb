@@ -27,7 +27,8 @@ interface WebConsoleStatus {
   urls: string[]
 }
 
-const primaryWebConsoleUrl = computed(() => webConsoleStatus.value.urls[0] || '等待服务启动')
+const uniqueUrls = computed(() => Array.from(new Set(webConsoleStatus.value.urls)))
+const primaryWebConsoleUrl = computed(() => uniqueUrls.value[0] || '等待服务启动')
 
 onMounted(async () => {
   if (!isTauri()) {
@@ -55,6 +56,19 @@ onUnmounted(async () => {
 
   unlistenWebConsoleChanged?.()
 })
+
+async function openUrl(url: string) {
+  if (isTauri()) {
+    try {
+      await invoke('open_url_in_browser', { url })
+    } catch (e) {
+      console.warn('Failed to open url via rust command', e)
+      window.open(url, '_blank')
+    }
+  } else {
+    window.open(url, '_blank')
+  }
+}
 </script>
 
 <template>
@@ -69,17 +83,22 @@ onUnmounted(async () => {
               <CardTitle class="font-(--font-display) text-2xl tracking-[-0.02em]">
                 Web 控制台
               </CardTitle>
-              <p class="break-all font-mono text-base font-semibold text-foreground">
+              <p 
+                class="break-all font-mono text-base font-semibold text-foreground"
+                :class="{ 'cursor-pointer hover:opacity-80 transition-opacity': uniqueUrls.length > 0 }"
+                @click="uniqueUrls.length > 0 && openUrl(uniqueUrls[0])"
+              >
                 {{ primaryWebConsoleUrl }}
               </p>
             </div>
           </div>
         </CardHeader>
-        <CardContent v-if="webConsoleStatus.urls.length > 1" class="grid gap-3 md:grid-cols-2">
+        <CardContent v-if="uniqueUrls.length > 1" class="grid gap-3 md:grid-cols-2">
           <p
-            v-for="url in webConsoleStatus.urls"
+            v-for="url in uniqueUrls"
             :key="url"
-            class="select-all break-all rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 font-mono text-sm text-muted-foreground"
+            class="cursor-pointer select-all break-all rounded-[1rem] border border-border/70 bg-background/70 px-4 py-3 font-mono text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+            @click="openUrl(url)"
           >
             {{ url }}
           </p>

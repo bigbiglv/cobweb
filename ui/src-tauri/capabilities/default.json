@@ -9,6 +9,7 @@
     "core:default",
     "core:window:allow-set-theme",
     "process:default",
-    "updater:default"
+    "updater:default",
+    "shell:allow-open"
   ]
 }

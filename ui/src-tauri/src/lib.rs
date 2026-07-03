@@ -717,10 +717,16 @@ fn remove_paired_client(app: tauri::AppHandle, client_id: String) -> Result<(), 
     Ok(())
 }
 
+#[tauri::command]
+fn open_url_in_browser(url: String) {
+    let _ = open::that(url);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(peripherals::init_state())
         .manage(MdnsRuntime::default())
@@ -759,7 +765,8 @@ pub fn run() {
             clear_clipboard_sync_messages,
             remove_paired_client,
             ping_mobile_device,
-            notify_mobile_disconnect
+            notify_mobile_disconnect,
+            open_url_in_browser
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
