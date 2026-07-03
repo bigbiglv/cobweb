@@ -88,6 +88,11 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .
+
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1.3
 
